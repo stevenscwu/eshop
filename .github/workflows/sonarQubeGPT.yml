@@ -1,0 +1,76 @@
+name: Backend SonarQube + GPT Summary
+
+on:
+  push:
+    paths:
+      - 'src/**'
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  sonar_scan:
+    name: SonarQube Scan
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Install SonarScanner
+        run: dotnet tool install --global dotnet-sonarscanner
+
+      - name: Begin SonarQube Scan
+        run: >
+          dotnet sonarscanner begin
+          /k:"eshop-backend"
+          /d:sonar.host.url="http://13.89.226.182:9000"
+          /d:sonar.login="${{ secrets.SONAR_TOKEN }}"
+
+      - name: Build Solution
+        run: dotnet build eShop.sln --no-restore
+
+      - name: End SonarQube Scan
+        run: dotnet sonarscanner end /d:sonar.login="${{ secrets.SONAR_TOKEN }}"
+
+      - name: Export Sonar Issues
+        run: >
+          curl -u "${{ secrets.SONAR_TOKEN }}:" \
+          "http://13.89.226.182:9000/api/issues/search?componentKeys=eshop-backend&ps=500" \
+          -o sonar_issues.json
+
+      - name: Upload Issues Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sonar-issues
+          path: sonar_issues.json
+
+  gpt_summarize:
+    name: GPT-4 Summary via Azure Function
+    needs: sonar_scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download Issues Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: sonar-issues
+
+      - name: Call Azure Function
+        run: >
+          curl -X POST \
+          -H "Content-Type: application/json" \
+          --data @sonar_issues.json \
+          "${{ secrets.GPT_FUNCTION_ENDPOINT }}" \
+          -o summary.md
+
+      - name: Upload GPT Summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: sonar-summary
+          path: summary.md

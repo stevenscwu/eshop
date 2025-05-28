@@ -1,0 +1,14 @@
+{
+  "issues": [
+    {
+      "severity": "CRITICAL",
+      "message": "Null pointer dereference might occur",
+      "component": "Catalog.API/Controllers/ProductController.cs"
+    },
+    {
+      "severity": "MAJOR",
+      "message": "Method has too many lines",
+      "component": "Basket.API/Controllers/BasketController.cs"
+    }
+  ]
+}
