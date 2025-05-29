@@ -1,16 +1,15 @@
 name: Playwright Tests for eShop
+
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
 
 jobs:
   test:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -18,10 +17,13 @@ jobs:
           node-version: 18
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
+        working-directory: src/Web
 
       - name: Install Playwright Browsers
         run: npx playwright install
+        working-directory: src/Web
 
       - name: Run Playwright tests
         run: npx playwright test
+        working-directory: src/Web

@@ -6,48 +6,37 @@ on:
 
 jobs:
   SonarQube-Scan:
-    name: SonarQube Scan
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
 
-      - name: Restore .NET dependencies
-        run: |
-          dotnet restore src/Ordering.API/Ordering.API.csproj
-          dotnet restore src/Catalog.API/Catalog.API.csproj
-          dotnet restore src/Ordering.Infrastructure/Ordering.Infrastructure.csproj
-          dotnet restore src/Basket.API/Basket.API.csproj
-          dotnet restore src/Ordering.Domain/Ordering.Domain.csproj
+      - name: Restore dependencies
+        run: dotnet restore src/Ordering.API/Ordering.API.csproj
 
       - name: SonarQube Begin Analysis
         run: |
-          dotnet sonarscanner begin /k:"eshop" /d:sonar.login="${ secrets.SONAR_TOKEN }" /d:sonar.host.url="${ secrets.SONAR_HOST_URL }"
+          dotnet tool install --global dotnet-sonarscanner
+          export PATH="$PATH:/home/runner/.dotnet/tools"
+          dotnet sonarscanner begin /k:"eshop" /d:sonar.login="${{ secrets.SONAR_TOKEN }}" /d:sonar.host.url="${{ secrets.SONAR_HOST_URL }}"
 
-      - name: Build project
-        run: |
-          dotnet build src/Ordering.API/Ordering.API.csproj --no-restore --configuration Release
-          dotnet build src/Catalog.API/Catalog.API.csproj --no-restore --configuration Release
-          dotnet build src/Ordering.Infrastructure/Ordering.Infrastructure.csproj --no-restore --configuration Release
-          dotnet build src/Basket.API/Basket.API.csproj --no-restore --configuration Release
-          dotnet build src/Ordering.Domain/Ordering.Domain.csproj --no-restore --configuration Release
+      - name: Build
+        run: dotnet build src/Ordering.API/Ordering.API.csproj --no-restore
 
       - name: SonarQube End Analysis
         run: |
-          dotnet sonarscanner end /d:sonar.login="${ secrets.SONAR_TOKEN }"
+          dotnet sonarscanner end /d:sonar.login="${{ secrets.SONAR_TOKEN }}"
 
   GPT-4-Summary-via-Azure-Function:
-    name: GPT-4 Summary via Azure Function
-    runs-on: ubuntu-latest
     needs: SonarQube-Scan
-
+    runs-on: ubuntu-latest
     steps:
-      - name: Trigger Azure Function to summarize results
+      - name: Call GPT-4 Azure Function
         run: |
-          curl -X POST "${ secrets.GPT_FUNCTION_ENDPOINT }"             -H "Content-Type: application/json"             -d '{ "sonarProjectKey": "eshop" }'
+          curl -X POST "${{ secrets.GPT_FUNCTION_ENDPOINT }}" \
+            -H "Content-Type: application/json" \
+            --data '{"summary": "Trigger from GitHub Action"}'

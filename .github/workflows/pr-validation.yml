@@ -1,27 +1,23 @@
-name: eShop Pull Request Validation
+name: Pull Request Validation
+
 on:
   pull_request:
-    branches:
-      - main
+    branches: [ main ]
 
 jobs:
   test:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: 8.0.x
 
-      - name: Restore .NET workloads
-        run: dotnet workload restore
-
-      - name: Restore dependencies
-        run: dotnet restore ./eShop.sln
+      - name: Restore
+        run: dotnet restore src/Ordering.API/Ordering.API.csproj
 
       - name: Build
-        run: dotnet build ./eShop.sln --no-restore
+        run: dotnet build src/Ordering.API/Ordering.API.csproj --no-restore
