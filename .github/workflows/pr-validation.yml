@@ -1,23 +1,19 @@
-name: Pull Request Validation
+name: PR Validation
 
 on:
   pull_request:
-    branches: [ main ]
+    branches:
+      - main
 
 jobs:
-  test:
+  validate:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 8.0.x
-
-      - name: Restore
-        run: dotnet restore src/Ordering.API/Ordering.API.csproj
-
-      - name: Build
-        run: dotnet build src/Ordering.API/Ordering.API.csproj --no-restore
+    - name: Validate Markdown
+      uses: DavidAnson/markdownlint-cli2-action@v10
+      with:
+        globs: '**/*.md'

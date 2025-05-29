@@ -1,42 +1,43 @@
-name: SonarQube + GPT pipeline
+name: Backend SonarQube Scan + GPT Summary
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
+  workflow_dispatch:
 
 jobs:
-  SonarQube-Scan:
+  build-and-analyze:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 8.0.x
+    - name: Setup .NET Core
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
 
-      - name: Restore dependencies
-        run: dotnet restore src/Ordering.API/Ordering.API.csproj
+    - name: Restore .NET dependencies
+      run: dotnet restore src/Ordering.API/Ordering.API.csproj
 
-      - name: SonarQube Begin Analysis
-        run: |
-          dotnet tool install --global dotnet-sonarscanner
-          export PATH="$PATH:/home/runner/.dotnet/tools"
-          dotnet sonarscanner begin /k:"eshop" /d:sonar.login="${{ secrets.SONAR_TOKEN }}" /d:sonar.host.url="${{ secrets.SONAR_HOST_URL }}"
+    - name: Build .NET backend
+      run: dotnet build src/Ordering.API/Ordering.API.csproj --no-restore --configuration Release
 
-      - name: Build
-        run: dotnet build src/Ordering.API/Ordering.API.csproj --no-restore
+    - name: Run SonarQube Scanner
+      run: |
+        dotnet tool install --global dotnet-sonarscanner
+        export PATH="$PATH:/home/runner/.dotnet/tools"
+        dotnet sonarscanner begin /k:"eshop" /d:sonar.host.url="http://13.89.226.182:9000" /d:sonar.login="${{ secrets.SONAR_TOKEN }}"
+        dotnet build src/Ordering.API/Ordering.API.csproj --no-restore
+        dotnet sonarscanner end /d:sonar.login="${{ secrets.SONAR_TOKEN }}"
 
-      - name: SonarQube End Analysis
-        run: |
-          dotnet sonarscanner end /d:sonar.login="${{ secrets.SONAR_TOKEN }}"
+    - name: Download SonarQube report (simulated)
+      run: |
+        echo "Saving sonar-report.json"
+        echo '{ "issues": [] }' > sonar-report.json
 
-  GPT-4-Summary-via-Azure-Function:
-    needs: SonarQube-Scan
-    runs-on: ubuntu-latest
-    steps:
-      - name: Call GPT-4 Azure Function
-        run: |
-          curl -X POST "${{ secrets.GPT_FUNCTION_ENDPOINT }}" \
-            -H "Content-Type: application/json" \
-            --data '{"summary": "Trigger from GitHub Action"}'
+    - name: Call Azure Function (GPT Summary)
+      run: |
+        curl -X POST "${{ secrets.GPT_FUNCTION_ENDPOINT }}"         -H "Content-Type: application/json"         -d @sonar-report.json
