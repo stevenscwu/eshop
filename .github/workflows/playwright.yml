@@ -1,27 +1,25 @@
-name: Playwright Tests for eShop
+name: Trigger SonarQube + GPT pipeline
 
 on:
   push:
-    branches: [ main ]
-  pull_request:
+    branches: [ main, latest_branch ]
 
 jobs:
   test:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18
-
+          node-version: '18'
       - name: Install dependencies
-        run: npm install
-
+        run: npm ci
       - name: Install Playwright Browsers
-        run: npx playwright install
-
+        run: npx playwright install --with-deps
+      - name: Install .NET SDK 8.0.400
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.400'
       - name: Run Playwright tests
         run: npx playwright test

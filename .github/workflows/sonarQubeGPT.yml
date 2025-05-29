@@ -2,43 +2,31 @@ name: Trigger SonarQube + GPT pipeline
 
 on:
   push:
-    branches: [ main ]
-  workflow_dispatch:
+    branches: [ main, latest_branch ]
 
 jobs:
   SonarQube-Scan:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup .NET 8
+      - name: Set up .NET 8.0.400
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 8.x
-
-      - name: Install Aspire Workload
-        run: dotnet workload install aspire
-
-      - name: Restore
-        run: dotnet restore ./eShop.Web.sln
-
+          dotnet-version: '8.0.400'
+      - name: Restore dependencies
+        run: dotnet restore ./eShop.sln
       - name: Build
-        run: dotnet build ./eShop.Web.sln --no-restore
-
-      - name: Run SonarQube Scan
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: dotnet build ./eShop.sln --no-restore --configuration Release
+      - name: Run SonarQube scan
         run: |
-          dotnet tool install --global dotnet-sonarscanner
-          export PATH="$PATH:/home/runner/.dotnet/tools"
           dotnet sonarscanner begin /k:"eshop" /d:sonar.host.url="${{ secrets.SONAR_HOST_URL }}" /d:sonar.login="${{ secrets.SONAR_TOKEN }}"
-          dotnet build ./eShop.Web.sln
+          dotnet build ./eShop.sln
           dotnet sonarscanner end /d:sonar.login="${{ secrets.SONAR_TOKEN }}"
 
   GPT-4-Summary-via-Azure-Function:
     needs: SonarQube-Scan
     runs-on: ubuntu-latest
     steps:
-      - name: Call Azure Function
+      - name: Call Azure Function for GPT summary
         run: |
-          curl -X POST "${{ secrets.GPT_FUNCTION_ENDPOINT }}"             -H "Content-Type: application/json"             -d '{ "projectKey": "eshop" }'
+          curl -X POST "${{ secrets.GPT_FUNCTION_ENDPOINT }}"           -H "Content-Type: application/json"           -d '{ "summary": "Trigger after SonarQube" }'
