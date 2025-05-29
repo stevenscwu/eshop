@@ -1,5 +1,4 @@
 name: eShop Pull Request Validation
-
 on:
   pull_request:
     branches:
@@ -10,7 +9,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
@@ -23,4 +24,4 @@ jobs:
         run: dotnet restore ./eShop.sln
 
       - name: Build
-        run: dotnet build ./eShop.sln --no-incremental
+        run: dotnet build ./eShop.sln --no-restore
