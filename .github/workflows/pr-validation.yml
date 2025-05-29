@@ -1,21 +1,26 @@
-name: Trigger SonarQube + GPT pipeline
+name: eShop Pull Request Validation
 
 on:
-  push:
-    branches: [ main, latest_branch ]
+  pull_request:
+    branches:
+      - main
 
 jobs:
   test:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
-      - name: Setup .NET 8
+      - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.400'
-      - name: Install Aspire Workload
-        run: dotnet workload install aspire
-      - name: Restore
+          dotnet-version: '8.0.x'
+
+      - name: Restore .NET workloads
+        run: dotnet workload restore
+
+      - name: Restore dependencies
         run: dotnet restore ./eShop.sln
+
       - name: Build
-        run: dotnet build ./eShop.sln --no-restore --configuration Release
+        run: dotnet build ./eShop.sln --no-incremental
