@@ -1,76 +1,44 @@
-name: Backend SonarQube + GPT Summary
+name: Trigger SonarQube + GPT pipeline
 
 on:
   push:
-    paths:
-      - 'src/**'
-    branches:
-      - main
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
-  sonar_scan:
-    name: SonarQube Scan
-    runs-on: windows-latest
-
+  SonarQube-Scan:
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup .NET
+      - name: Setup .NET 8
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: 8.x
 
-      - name: Install SonarScanner
-        run: dotnet tool install --global dotnet-sonarscanner
+      - name: Install Aspire Workload
+        run: dotnet workload install aspire
 
-      - name: Begin SonarQube Scan
-        run: >
-          dotnet sonarscanner begin
-          /k:"eshop-backend"
-          /d:sonar.host.url="http://13.89.226.182:9000"
-          /d:sonar.login="${{ secrets.SONAR_TOKEN }}"
+      - name: Restore
+        run: dotnet restore ./eShop.Web.sln
 
-      - name: Build Solution
-        run: dotnet build eShop.sln --no-restore
+      - name: Build
+        run: dotnet build ./eShop.Web.sln --no-restore
 
-      - name: End SonarQube Scan
-        run: dotnet sonarscanner end /d:sonar.login="${{ secrets.SONAR_TOKEN }}"
+      - name: Run SonarQube Scan
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          dotnet tool install --global dotnet-sonarscanner
+          export PATH="$PATH:/home/runner/.dotnet/tools"
+          dotnet sonarscanner begin /k:"eshop" /d:sonar.host.url="${{ secrets.SONAR_HOST_URL }}" /d:sonar.login="${{ secrets.SONAR_TOKEN }}"
+          dotnet build ./eShop.Web.sln
+          dotnet sonarscanner end /d:sonar.login="${{ secrets.SONAR_TOKEN }}"
 
-      - name: Export Sonar Issues
-        run: >
-          curl -u "${{ secrets.SONAR_TOKEN }}:" \
-          "http://13.89.226.182:9000/api/issues/search?componentKeys=eshop-backend&ps=500" \
-          -o sonar_issues.json
-
-      - name: Upload Issues Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: sonar-issues
-          path: sonar_issues.json
-
-  gpt_summarize:
-    name: GPT-4 Summary via Azure Function
-    needs: sonar_scan
+  GPT-4-Summary-via-Azure-Function:
+    needs: SonarQube-Scan
     runs-on: ubuntu-latest
-
     steps:
-      - name: Download Issues Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: sonar-issues
-
       - name: Call Azure Function
-        run: >
-          curl -X POST \
-          -H "Content-Type: application/json" \
-          --data @sonar_issues.json \
-          "${{ secrets.GPT_FUNCTION_ENDPOINT }}" \
-          -o summary.md
-
-      - name: Upload GPT Summary
-        uses: actions/upload-artifact@v4
-        with:
-          name: sonar-summary
-          path: summary.md
+        run: |
+          curl -X POST "${{ secrets.GPT_FUNCTION_ENDPOINT }}"             -H "Content-Type: application/json"             -d '{ "projectKey": "eshop" }'
