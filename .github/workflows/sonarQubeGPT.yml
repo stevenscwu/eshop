@@ -1,4 +1,4 @@
-name: SonarQube + GPT4
+name: sonar-gpt
 
 on:
   push:
@@ -7,33 +7,33 @@ on:
 
 jobs:
   sonar-gpt:
+    name: SonarQube Self-Hosted Scan
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up .NET
+      - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.x'
+          dotnet-version: '8.0.x'
 
-      - name: Install SonarScanner
+      - name: Install SonarScanner for .NET
         run: dotnet tool install --global dotnet-sonarscanner
 
-      - name: Add SonarScanner to PATH
+      - name: Add to PATH
         run: echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
 
       - name: Begin SonarQube scan
         run: |
-          dotnet sonarscanner begin \
-            /k:"eshoponweb" \
-            /d:sonar.host.url="http://13.89.226.182:9000" \
-            /d:sonar.login="${{ secrets.SONARQUBE_TOKEN }}"
+          dotnet sonarscanner begin \\
+            /k:"eshoponweb" \\
+            /d:sonar.login="${{ secrets.SONAR_TOKEN }}" \\
+            /d:sonar.host.url="http://13.89.226.182:9000/"
 
-      - name: Build solution
-        run: dotnet build eShop.sln --no-incremental
+      - name: Build
+        run: dotnet build src/Ordering.API/Ordering.API.csproj --no-incremental
 
       - name: End SonarQube scan
-        run: |
-          dotnet sonarscanner end \
-            /d:sonar.login="${{ secrets.SONARQUBE_TOKEN }}"
+        run: dotnet sonarscanner end /d:sonar.login="${{ secrets.SONAR_TOKEN }}"
