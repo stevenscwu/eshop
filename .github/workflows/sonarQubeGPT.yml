@@ -1,3 +1,5 @@
+# .github/workflows/sonarQubeGPT.yml
+
 name: sonar-gpt
 
 on:
@@ -7,33 +9,56 @@ on:
 
 jobs:
   sonar-gpt:
-    name: SonarQube Self-Hosted Scan
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.0.x'
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-      - name: Install SonarScanner for .NET
-        run: dotnet tool install --global dotnet-sonarscanner
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
 
-      - name: Add to PATH
-        run: echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
+    - name: Install SonarScanner for .NET
+      run: dotnet tool install --global dotnet-sonarscanner
 
-      - name: Begin SonarQube scan
-        run: |
-          dotnet sonarscanner begin \
-            /k:"eshoponweb" \
-            /d:sonar.login="${{ secrets.SONAR_TOKEN }}" \
-            /d:sonar.host.url="http://13.89.226.182:9000/"
+    - name: Add tools to PATH
+      run: echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
 
-      - name: Build
-        run: dotnet build src/Ordering.API/Ordering.API.csproj --no-incremental
+    - name: Begin SonarQube scan
+      env:
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      run: |
+        dotnet sonarscanner begin \
+          /k:"eshoponweb" \
+          /d:sonar.host.url="http://13.89.226.182:9000" \
+          /d:sonar.login="$SONAR_TOKEN"
 
-      - name: End SonarQube scan
-        run: dotnet sonarscanner end /d:sonar.login="${{ secrets.SONAR_TOKEN }}"
+    - name: Build
+      run: dotnet build src/Ordering.API/Ordering.API.csproj
+
+    - name: End SonarQube scan
+      env:
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      run: dotnet sonarscanner end /d:sonar.login="$SONAR_TOKEN"
+
+    - name: Export SonarQube issues
+      env:
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      run: |
+        curl -s -u "$SONAR_TOKEN": "http://13.89.226.182:9000/api/issues/search?componentKeys=eshoponweb" > sonar-report.json
+
+    - name: Call Azure Function with GPT-4
+      run: |
+        curl -X POST \
+          -H "Content-Type: application/json" \
+          --data-binary "@sonar-report.json" \
+          "${{ secrets.AZURE_FUNCTION_URL }}" \
+          -o summary.md
+
+    - name: Upload GPT summary
+      uses: actions/upload-artifact@v3
+      with:
+        name: gpt-summary
+        path: summary.md
