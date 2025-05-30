@@ -1,34 +1,16 @@
-name: sonar-gpt
+name: Analyze SonarQube Findings with GPT-4
 
 on:
   push:
-    branches:
-      - main
+    paths:
+      - '.github/workflows/sonarQubeGPT.yml'
 
 jobs:
   sonar-gpt:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
+      - name: Checkout repo
         uses: actions/checkout@v4
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.0.x'
-
-      - name: Install SonarScanner for .NET
-        run: dotnet tool install --global dotnet-sonarscanner
-
-      - name: Add tools to PATH
-        run: echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
-
-      - name: Begin SonarQube scan
-        run: |
-          dotnet sonarscanner begin /k:"eshoponweb" /d:sonar.host.url="http://13.89.226.182:9000" /d:sonar.login="${{ secrets.SONARQUBE_TOKEN }}"
-        env:
-          SONARQUBE_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
 
       - name: Build Ordering.API
         run: dotnet build src/Services/Ordering/Ordering.API/Ordering.API.csproj --no-incremental
@@ -50,40 +32,41 @@ jobs:
           AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
           AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
         run: |
-          python3 -c "
-import openai, os, re
-openai.api_key = os.getenv('AZURE_OPENAI_API_KEY')
-openai.api_base = os.getenv('AZURE_OPENAI_ENDPOINT')
-openai.api_type = 'azure'
-openai.api_version = '2023-07-01-preview'
+          python3 <<EOF
+          import openai, os
 
-def read_sonar_summary():
-    with open('.scannerwork/report-task.txt') as f:
-        content = f.read()
-    return content
+          openai.api_key = os.getenv('AZURE_OPENAI_API_KEY')
+          openai.api_base = os.getenv('AZURE_OPENAI_ENDPOINT')
+          openai.api_type = 'azure'
+          openai.api_version = '2023-07-01-preview'
 
-report = read_sonar_summary()
+          def read_sonar_summary():
+              with open('.scannerwork/report-task.txt') as f:
+                  return f.read()
 
-prompt = f'''
-You are a senior security expert. Analyze this SonarQube scan result carefully:
-{report}
+          report = read_sonar_summary()
+          prompt = f"""
+          You are a senior security expert. Analyze this SonarQube scan result carefully:
 
-1. List all vulnerabilities with severity and short description.
-2. Identify potential code smells or anti-patterns that SonarQube may miss.
-3. Recommend improvements or refactoring.
-4. Highlight any signs of insecure design.
-'''
+          {report}
 
-response = openai.ChatCompletion.create(
-    engine='gpt-4',
-    messages=[
-        {{'role': 'system', 'content': 'You are an expert in code security auditing.'}},
-        {{'role': 'user', 'content': prompt}}
-    ],
-    temperature=0.3,
-    max_tokens=2048
-)
+          Please:
+          1. List all vulnerabilities with severity and short description.
+          2. Identify potential code smells or anti-patterns that SonarQube may miss.
+          3. Recommend improvements or refactoring.
+          4. Highlight any signs of insecure design.
+          """
 
-print('GPT-4 Security Insight Summary:')
-print(response['choices'][0]['message']['content'])
-"
+          response = openai.ChatCompletion.create(
+              engine='gpt4-sec',
+              messages=[
+                  {'role': 'system', 'content': 'You are an expert in code security auditing.'},
+                  {'role': 'user', 'content': prompt}
+              ],
+              temperature=0.3,
+              max_tokens=2048
+          )
+
+          print('GPT-4 Security Insight Summary:')
+          print(response['choices'][0]['message']['content'])
+          EOF
