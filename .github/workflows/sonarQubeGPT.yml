@@ -1,43 +1,40 @@
-name: Backend SonarQube Scan + GPT Summary
+name: SonarQube Scan + GPT Summary
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
 
 jobs:
-  build-and-analyze:
+  sonar-gpt:
     runs-on: ubuntu-latest
-
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v3
 
-    - name: Setup .NET Core
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: '8.0.x'
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
 
-    - name: Restore .NET dependencies
-      run: dotnet restore src/Ordering.API/Ordering.API.csproj
+      - name: Restore Dependencies
+        run: dotnet restore
 
-    - name: Build .NET backend
-      run: dotnet build src/Ordering.API/Ordering.API.csproj --no-restore --configuration Release
+      - name: Build Solution
+        run: dotnet build --no-restore
 
-    - name: Run SonarQube Scanner
-      run: |
-        dotnet tool install --global dotnet-sonarscanner
-        export PATH="$PATH:/home/runner/.dotnet/tools"
-        dotnet sonarscanner begin /k:"eshop" /d:sonar.host.url="http://13.89.226.182:9000" /d:sonar.login="${{ secrets.SONAR_TOKEN }}"
-        dotnet build src/Ordering.API/Ordering.API.csproj --no-restore
-        dotnet sonarscanner end /d:sonar.login="${{ secrets.SONAR_TOKEN }}"
+      - name: Run SonarQube Scan
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          dotnet tool install --global dotnet-sonarscanner
+          dotnet sonarscanner begin /k:"eshop" /d:sonar.host.url="http://13.89.226.182:9000" /d:sonar.login="${{ secrets.SONAR_TOKEN }}"
+          dotnet build
+          dotnet sonarscanner end /d:sonar.login="${{ secrets.SONAR_TOKEN }}"
 
-    - name: Download SonarQube report (simulated)
-      run: |
-        echo "Saving sonar-report.json"
-        echo '{ "issues": [] }' > sonar-report.json
-
-    - name: Call Azure Function (GPT Summary)
-      run: |
-        curl -X POST "${{ secrets.GPT_FUNCTION_ENDPOINT }}"         -H "Content-Type: application/json"         -d @sonar-report.json
+      - name: Call GPT-4 Azure Function for Summary
+        env:
+          FUNCTION_ENDPOINT: ${{ secrets.GPT_FUNCTION_ENDPOINT }}
+        run: |
+          echo '{}' > sonar_payload.json  # Replace with actual payload or fetch logic
+          curl -X POST "$FUNCTION_ENDPOINT"                -H "Content-Type: application/json"                --data @sonar_payload.json
