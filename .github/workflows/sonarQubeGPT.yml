@@ -1,37 +1,41 @@
-name: SonarQube Scan Only
+name: SonarQube + GPT4
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
 
 jobs:
   sonar-gpt:
     runs-on: ubuntu-latest
-
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Set up .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: '8.0.x'
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.x'
 
-    - name: Install SonarScanner
-      run: dotnet tool install --global dotnet-sonarscanner
+      - name: Install SonarScanner
+        run: dotnet tool install --global dotnet-sonarscanner
 
-    - name: Add SonarScanner to PATH
-      run: echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
+      - name: Add SonarScanner to PATH
+        run: echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
 
-    - name: Begin SonarQube scan
-      run: |
-        dotnet sonarscanner begin \
-          /k:"eshoponweb" \
-          /d:sonar.host.url="http://13.89.226.182:9000" \
-          /d:sonar.login="${{ secrets.SONARQUBE_TOKEN }}"
+      - name: Build project (Web)
+        run: dotnet build src/Web/Web.csproj --no-incremental
 
-    - name: Build project
-      run: dotnet build src/Web/Web.csproj --no-incremental
+      - name: Begin SonarQube scan
+        run: |
+          dotnet sonarscanner begin \
+            /k:"eshoponweb" \
+            /d:sonar.host.url="http://13.89.226.182:9000" \
+            /d:sonar.login="${{ secrets.SONARQUBE_TOKEN }}"
+      - name: Run build again for analysis
+        run: dotnet build src/Web/Web.csproj --no-incremental
 
-    - name: End SonarQube scan
-      run: dotnet sonarscanner end /d:sonar.login="${{ secrets.SONARQUBE_TOKEN }}"
+      - name: End SonarQube scan
+        run: |
+          dotnet sonarscanner end \
+            /d:sonar.login="${{ secrets.SONARQUBE_TOKEN }}"
