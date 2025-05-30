@@ -23,17 +23,15 @@ jobs:
       - name: Add SonarScanner to PATH
         run: echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
 
-      - name: Build project (Web)
-        run: dotnet build src/Web/Web.csproj --no-incremental
-
       - name: Begin SonarQube scan
         run: |
           dotnet sonarscanner begin \
             /k:"eshoponweb" \
             /d:sonar.host.url="http://13.89.226.182:9000" \
             /d:sonar.login="${{ secrets.SONARQUBE_TOKEN }}"
-      - name: Run build again for analysis
-        run: dotnet build src/Web/Web.csproj --no-incremental
+
+      - name: Build solution
+        run: dotnet build eShop.sln --no-incremental
 
       - name: End SonarQube scan
         run: |
