@@ -1,72 +1,36 @@
-name: Analyze SonarQube Findings with GPT-4
+name: SonarQube Scan Only
 
 on:
   push:
-    paths:
-      - '.github/workflows/sonarQubeGPT.yml'
+    branches: [ main ]
 
 jobs:
   sonar-gpt:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
+    - name: Checkout
+      uses: actions/checkout@v4
 
-      - name: Build Ordering.API
-        run: dotnet build src/Services/Ordering/Ordering.API/Ordering.API.csproj --no-incremental
+    - name: Set up .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
 
-      - name: End SonarQube scan
-        run: |
-          dotnet sonarscanner end /d:sonar.login="${{ secrets.SONARQUBE_TOKEN }}"
-        env:
-          SONARQUBE_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
+    - name: Install SonarScanner
+      run: dotnet tool install --global dotnet-sonarscanner
 
-      - name: Upload SonarQube Report for GPT
-        uses: actions/upload-artifact@v3
-        with:
-          name: sonar-report
-          path: .scannerwork/report-task.txt
+    - name: Add SonarScanner to PATH
+      run: echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
 
-      - name: Analyze SonarQube Findings with GPT-4
-        env:
-          AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
-          AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
-        run: |
-          python3 <<EOF
-          import openai, os
+    - name: Build project (Ordering.API)
+      run: dotnet build src/Services/Ordering/Ordering.API/Ordering.API.csproj --no-incremental
 
-          openai.api_key = os.getenv('AZURE_OPENAI_API_KEY')
-          openai.api_base = os.getenv('AZURE_OPENAI_ENDPOINT')
-          openai.api_type = 'azure'
-          openai.api_version = '2023-07-01-preview'
+    - name: Begin SonarQube scan
+      run: dotnet sonarscanner begin /k:"eshoponweb" /d:sonar.host.url="http://13.89.226.182:9000" /d:sonar.login="${{ secrets.SONARQUBE_TOKEN }}"
 
-          def read_sonar_summary():
-              with open('.scannerwork/report-task.txt') as f:
-                  return f.read()
+    - name: Run build again for analysis
+      run: dotnet build src/Services/Ordering/Ordering.API/Ordering.API.csproj --no-incremental
 
-          report = read_sonar_summary()
-          prompt = f"""
-          You are a senior security expert. Analyze this SonarQube scan result carefully:
-
-          {report}
-
-          Please:
-          1. List all vulnerabilities with severity and short description.
-          2. Identify potential code smells or anti-patterns that SonarQube may miss.
-          3. Recommend improvements or refactoring.
-          4. Highlight any signs of insecure design.
-          """
-
-          response = openai.ChatCompletion.create(
-              engine='gpt4-sec',
-              messages=[
-                  {'role': 'system', 'content': 'You are an expert in code security auditing.'},
-                  {'role': 'user', 'content': prompt}
-              ],
-              temperature=0.3,
-              max_tokens=2048
-          )
-
-          print('GPT-4 Security Insight Summary:')
-          print(response['choices'][0]['message']['content'])
-          EOF
+    - name: End SonarQube scan
+      run: dotnet sonarscanner end /d:sonar.login="${{ secrets.SONARQUBE_TOKEN }}"
