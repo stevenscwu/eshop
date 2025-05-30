@@ -4,35 +4,36 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch:
 
 jobs:
   sonar-gpt:
+    name: SonarQube Self-Hosted Scan
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v3
+        uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
 
       - name: Install SonarScanner for .NET
         run: dotnet tool install --global dotnet-sonarscanner
 
-      - name: Add tools to PATH
+      - name: Add to PATH
         run: echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
 
       - name: Begin SonarQube scan
         run: |
-          dotnet sonarscanner begin /k:"eshop" \
-            /d:sonar.host.url="https://sonarcloud.io" \
+          dotnet sonarscanner begin \
+            /k:"eshoponweb" \
             /d:sonar.login="${{ secrets.SONAR_TOKEN }}" \
-            /d:sonar.exclusions="**/*AppHost*/**,**/*Aspire*/**,**/*Maui*/**,**/*Tests*/**"
+            /d:sonar.host.url="http://13.89.226.182:9000/"
 
-      - name: Build the solution
-        run: dotnet build --no-incremental
+      - name: Build
+        run: dotnet build src/Ordering.API/Ordering.API.csproj --no-incremental
 
       - name: End SonarQube scan
         run: dotnet sonarscanner end /d:sonar.login="${{ secrets.SONAR_TOKEN }}"
