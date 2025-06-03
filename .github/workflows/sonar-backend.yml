@@ -33,7 +33,8 @@ jobs:
         dotnet sonarscanner begin \
           /k:"eshoponweb" \
           /d:sonar.login="${SONAR_TOKEN}" \
-          /d:sonar.host.url="http://13.89.226.182:9000"
+          /d:sonar.host.url="http://13.89.226.182:9000" \
+          /d:sonar.exclusions="**/*.razor"
 
     - name: Build project
       run: dotnet build eShopOnWeb.sln --no-restore --configuration Release
