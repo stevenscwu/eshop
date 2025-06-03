@@ -32,7 +32,6 @@ jobs:
       run: |
         dotnet sonarscanner begin \
           /k:"eshoponweb" \
-          /s:"eShopOnWeb.sln" \
           /d:sonar.login="${SONAR_TOKEN}" \
           /d:sonar.host.url="http://13.89.226.182:9000"
 
