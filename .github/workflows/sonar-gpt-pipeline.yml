@@ -1,0 +1,66 @@
+name: Fullstack Security Analysis with SonarQube + GPT-4
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: '8.x'
+
+    - name: Install SonarScanner
+      run: dotnet tool install --global dotnet-sonarscanner
+
+    - name: Begin SonarQube Scan
+      run: |
+        dotnet sonarscanner begin \
+          /k:"eshop-web-dotnet8" \
+          /d:sonar.login="${{ secrets.SONAR_TOKEN }}" \
+          /d:sonar.host.url="${{ secrets.SONAR_HOST_URL }}" \
+          /d:sonar.verbose=true \
+          /d:sonar.exclusions="**/obj/**,**/bin/**,**/*.json"
+
+    - name: Build solution
+      run: dotnet build eShopOnWeb.sln --no-incremental
+
+    - name: End SonarQube Scan
+      run: dotnet sonarscanner end /d:sonar.login="${{ secrets.SONAR_TOKEN }}"
+
+    - name: Wait for SonarQube to finalize
+      run: sleep 15
+
+    - name: Download SonarQube issues report
+      run: |
+        curl -s -u "${{ secrets.SONAR_TOKEN }}:" \
+          "${{ secrets.SONAR_HOST_URL }}/api/issues/search?componentKeys=eshop-web-dotnet8" \
+          -o sonar-report.json
+
+    - name: Combine prompt + report for GPT
+      run: |
+        jq -n --argfile report sonar-report.json \
+              --arg prompt "You are a senior security analyst. Analyze this SonarQube issue report. Identify critical risks, reduce false positives, group similar issues, and recommend remediation strategies in markdown format." \
+              '{prompt: $prompt, report: $report}' > gpt-payload.json
+
+    - name: Call Azure Function (GPT-4 Summary)
+      id: gpt
+      run: |
+        RESPONSE=$(curl -s -X POST "${{ secrets.GPT_FUNCTION_ENDPOINT }}" \
+          -H "Content-Type: application/json" \
+          --data-binary @gpt-payload.json)
+
+        echo "GPT_RESPONSE<<EOF" >> $GITHUB_ENV
+        echo "$RESPONSE" >> $GITHUB_ENV
+        echo "EOF" >> $GITHUB_ENV
+
+    - name: Display GPT Summary
+      run: echo "${{ env.GPT_RESPONSE }}"
