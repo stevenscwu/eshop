@@ -54,9 +54,16 @@ jobs:
         REPORT=$(cat sonar-report.json | jq -c .)
         echo "{\"prompt\": \"You are a senior security analyst. Analyze this SonarQube issue report. Group similar issues, reduce false positives, highlight critical risks, and provide remediation advice in markdown format.\", \"report\": $REPORT}" > gpt-payload.json
 
-    - name: Send SonarQube Report to GPT-4
+    - name: Call GPT-4 and Save Summary
       run: |
-        echo "Calling GPT-4 to analyze report..."
-        curl -s -X POST "${{ secrets.GPT_FUNCTION_ENDPOINT }}" \
+        echo "Calling GPT-4 to analyze SonarQube report..."
+        RESPONSE=$(curl -s -X POST "${{ secrets.GPT_FUNCTION_ENDPOINT }}" \
           -H "Content-Type: application/json" \
-          --data-binary @gpt-payload.json
+          --data-binary @gpt-payload.json)
+        echo "$RESPONSE" > gpt-summary.md
+
+    - name: Upload GPT-4 Summary as Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: gpt4-summary
+        path: gpt-summary.md
