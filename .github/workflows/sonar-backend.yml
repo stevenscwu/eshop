@@ -1,0 +1,33 @@
+name: SonarQube Backend Scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  sonar:
+    name: SonarQube Scan (.NET Backend)
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Setup .NET SDK
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: '8.x'
+
+    - name: Install SonarScanner
+      run: dotnet tool install --global dotnet-sonarscanner
+
+    - name: Begin SonarQube Scan
+      run: dotnet sonarscanner begin /k:"eshoponweb" /d:sonar.login="${{ secrets.SONAR_TOKEN }}" /d:sonar.host.url="http://13.89.226.182:9000"
+    
+    - name: Build solution
+      run: dotnet build eShopOnWeb.sln
+
+    - name: End SonarQube Scan
+      run: dotnet sonarscanner end /d:sonar.login="${{ secrets.SONAR_TOKEN }}"
