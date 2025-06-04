@@ -28,7 +28,7 @@ jobs:
           /d:sonar.login="${{ secrets.SONAR_TOKEN }}" \
           /d:sonar.host.url="${{ secrets.SONAR_HOST_URL }}" \
           /d:sonar.verbose=true \
-          /d:sonar.exclusions="**/obj/**,**/bin/**,**/*.json"
+          /d:sonar.exclusions="**/obj/**,**/bin/**,**/*.json,**/BlazorAdmin/**"
 
     - name: Clean, Restore and Build
       run: |
