@@ -49,11 +49,10 @@ jobs:
           "${{ secrets.SONAR_HOST_URL }}/api/issues/search?componentKeys=eshop-web-dotnet8" \
           -o sonar-report.json
 
-    - name: Combine GPT Prompt with Report
+    - name: Combine GPT Prompt with Report (safe for jq 1.5)
       run: |
-        jq -n --argfile report sonar-report.json \
-          --arg prompt "You are a senior security analyst. Analyze this SonarQube issue report. Group similar issues, reduce false positives, highlight critical risks, and provide remediation advice in markdown format." \
-          '{prompt: $prompt, report: $report}' > gpt-payload.json
+        REPORT=$(cat sonar-report.json | jq -c .)
+        echo "{\"prompt\": \"You are a senior security analyst. Analyze this SonarQube issue report. Group similar issues, reduce false positives, highlight critical risks, and provide remediation advice in markdown format.\", \"report\": $REPORT}" > gpt-payload.json
 
     - name: Send SonarQube Report to GPT-4
       run: |
