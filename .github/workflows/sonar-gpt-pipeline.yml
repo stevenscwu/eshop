@@ -1,10 +1,9 @@
-name: SonarQube and GPT-4 Security Analysis
+name: Fullstack Security Analysis with SonarQube + GPT-4
 
 on:
+  workflow_dispatch:
   push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   analyze:
@@ -12,58 +11,53 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v3
 
-    - name: Set up .NET
+    - name: Setup .NET SDK
       uses: actions/setup-dotnet@v3
       with:
-        dotnet-version: '8.0.x'
+        dotnet-version: '8.x'
 
-    - name: Clean previous SonarQube cache
-      run: rm -rf .sonarqube
+    - name: Install SonarScanner
+      run: dotnet tool install --global dotnet-sonarscanner
+
+    - name: Begin SonarQube Scan
+      run: |
+        dotnet sonarscanner begin \
+          /k:"eshop-web-dotnet8" \
+          /d:sonar.login="${{ secrets.SONAR_TOKEN }}" \
+          /d:sonar.host.url="${{ secrets.SONAR_HOST_URL }}" \
+          /d:sonar.verbose=true \
+          /d:sonar.exclusions="**/obj/**,**/bin/**,**/*.json"
 
     - name: Clean, Restore and Build
       run: |
-        dotnet clean
-        dotnet restore
-        dotnet build --no-incremental
-
-    - name: Begin SonarQube Scan
-      env:
-        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      run: |
-        dotnet sonarscanner begin \
-          /k:"eshop" \
-          /d:sonar.host.url="${{ secrets.SONAR_HOST_URL }}" \
-          /d:sonar.login="${{ secrets.SONAR_TOKEN }}"
-
-    - name: Build (required for analysis)
-      run: dotnet build
+        dotnet clean eShopOnWeb.sln
+        dotnet restore eShopOnWeb.sln
+        dotnet build eShopOnWeb.sln --no-incremental
 
     - name: End SonarQube Scan
-      env:
-        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      run: dotnet sonarscanner end /d:sonar.login="${{ secrets.SONAR_TOKEN }}"
-
-    - name: Upload SonarQube Report
-      if: always()
       run: |
-        mkdir -p artifacts
-        cp .sonarqube/out/.sonar/report-task.txt artifacts/
-      continue-on-error: true
+        dotnet sonarscanner end /d:sonar.login="${{ secrets.SONAR_TOKEN }}"
+
+    - name: Wait for SonarQube to finalize
+      run: sleep 15
+
+    - name: Download SonarQube Issues
+      run: |
+        curl -s -u "${{ secrets.SONAR_TOKEN }}:" \
+          "${{ secrets.SONAR_HOST_URL }}/api/issues/search?componentKeys=eshop-web-dotnet8" \
+          -o sonar-report.json
+
+    - name: Combine GPT Prompt with Report
+      run: |
+        jq -n --argfile report sonar-report.json \
+          --arg prompt "You are a senior security analyst. Analyze this SonarQube issue report. Group similar issues, reduce false positives, highlight critical risks, and provide remediation advice in markdown format." \
+          '{prompt: $prompt, report: $report}' > gpt-payload.json
 
     - name: Send SonarQube Report to GPT-4
-      if: success() || failure()  # Run even if sonar fails
-      env:
-        GPT4_ENDPOINT: ${{ secrets.GPT4_ENDPOINT }}
-        GPT4_API_KEY: ${{ secrets.GPT4_API_KEY }}
       run: |
         echo "Calling GPT-4 to analyze report..."
-        curl -X POST "$GPT4_ENDPOINT" \
-          -H "Authorization: Bearer $GPT4_API_KEY" \
+        curl -s -X POST "${{ secrets.GPT_FUNCTION_ENDPOINT }}" \
           -H "Content-Type: application/json" \
-          -d '{
-                "role": "security expert",
-                "prompt": "You are a security expert. Analyze the following SonarQube report for vulnerabilities, reduce false positives, and summarize the findings in plain English.",
-                "report_path": "artifacts/report-task.txt"
-              }'
+          --data-binary @gpt-payload.json
