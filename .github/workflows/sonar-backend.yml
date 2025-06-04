@@ -26,12 +26,13 @@ jobs:
     - name: Begin SonarQube Scan
       run: |
         dotnet sonarscanner begin \
-          /k:"eshoponweb" \
+          /k:"eshop-web-dotnet8" \
           /d:sonar.login="${{ secrets.SONAR_TOKEN }}" \
           /d:sonar.host.url="http://13.89.226.182:9000" \
           /d:sonar.verbose=true \
-          /d:sonar.cs.roslyn.ignoreIssues=false \
+          /d:sonar.inclusions="src/ApplicationCore/**,src/Infrastructure/**,src/Web/**" \
           /d:sonar.exclusions="**/obj/**,**/bin/**,**/*.json"
+
 
 
     
