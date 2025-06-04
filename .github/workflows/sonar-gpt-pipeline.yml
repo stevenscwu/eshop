@@ -1,4 +1,4 @@
-name: Fullstack Security Analysis with SonarQube + GPT-4
+name: Fullstack Security Analysis with SonarQube + GPT-4 + Azure Blob Upload
 
 on:
   workflow_dispatch:
@@ -60,24 +60,12 @@ jobs:
         RESPONSE=$(curl -s -X POST "${{ secrets.GPT_FUNCTION_ENDPOINT }}" \
           -H "Content-Type: application/json" \
           --data-binary @gpt-payload.json)
-        if [ -z "$RESPONSE" ]; then
-          echo "Error: No response from GPT-4 API."
-          exit 1
-        fi
         echo "$RESPONSE" > gpt-summary.md
-        cat gpt-summary.md
 
-    - name: Check if GPT-4 Summary Exists
+    - name: Upload GPT-4 Summary to Azure Blob Storage
       run: |
-        if [ ! -f gpt-summary.md ]; then
-          echo "Error: gpt-summary.md not found!"
-          exit 1
-        else
-          echo "gpt-summary.md found."
-        fi
-
-    - name: Upload GPT-4 Summary as Artifact
-      uses: actions/upload-artifact@v2
-      with:
-        name: gpt4-summary
-        path: gpt-summary.md
+        echo "Uploading GPT-4 summary to Azure Blob..."
+        BLOB_NAME="gpt-summary-$(date +%Y%m%d-%H%M%S).md"
+        curl -X PUT "${{ secrets.AZURE_BLOB_SAS_URL }}/${BLOB_NAME}" \
+          -H "x-ms-blob-type: BlockBlob" \
+          --data-binary @gpt-summary.md
