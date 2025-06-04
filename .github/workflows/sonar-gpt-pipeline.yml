@@ -1,9 +1,10 @@
-name: Fullstack Security Analysis with SonarQube + GPT-4
+name: SonarQube and GPT-4 Security Analysis
 
 on:
-  workflow_dispatch:
   push:
-    branches: [main]
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
   analyze:
@@ -11,56 +12,58 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
-    - name: Setup .NET
+    - name: Set up .NET
       uses: actions/setup-dotnet@v3
       with:
-        dotnet-version: '8.x'
+        dotnet-version: '8.0.x'
 
-    - name: Install SonarScanner
-      run: dotnet tool install --global dotnet-sonarscanner
+    - name: Clean previous SonarQube cache
+      run: rm -rf .sonarqube
+
+    - name: Clean, Restore and Build
+      run: |
+        dotnet clean
+        dotnet restore
+        dotnet build --no-incremental
 
     - name: Begin SonarQube Scan
+      env:
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       run: |
         dotnet sonarscanner begin \
-          /k:"eshop-web-dotnet8" \
-          /d:sonar.login="${{ secrets.SONAR_TOKEN }}" \
+          /k:"eshop" \
           /d:sonar.host.url="${{ secrets.SONAR_HOST_URL }}" \
-          /d:sonar.verbose=true \
-          /d:sonar.exclusions="**/obj/**,**/bin/**,**/*.json"
+          /d:sonar.login="${{ secrets.SONAR_TOKEN }}"
 
-    - name: Build solution
-      run: dotnet build eShopOnWeb.sln --no-incremental
+    - name: Build (required for analysis)
+      run: dotnet build
 
     - name: End SonarQube Scan
+      env:
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       run: dotnet sonarscanner end /d:sonar.login="${{ secrets.SONAR_TOKEN }}"
 
-    - name: Wait for SonarQube to finalize
-      run: sleep 15
-
-    - name: Download SonarQube issues report
+    - name: Upload SonarQube Report
+      if: always()
       run: |
-        curl -s -u "${{ secrets.SONAR_TOKEN }}:" \
-          "${{ secrets.SONAR_HOST_URL }}/api/issues/search?componentKeys=eshop-web-dotnet8" \
-          -o sonar-report.json
+        mkdir -p artifacts
+        cp .sonarqube/out/.sonar/report-task.txt artifacts/
+      continue-on-error: true
 
-    - name: Combine prompt + report for GPT
+    - name: Send SonarQube Report to GPT-4
+      if: success() || failure()  # Run even if sonar fails
+      env:
+        GPT4_ENDPOINT: ${{ secrets.GPT4_ENDPOINT }}
+        GPT4_API_KEY: ${{ secrets.GPT4_API_KEY }}
       run: |
-        jq -n --argfile report sonar-report.json \
-              --arg prompt "You are a senior security analyst. Analyze this SonarQube issue report. Identify critical risks, reduce false positives, group similar issues, and recommend remediation strategies in markdown format." \
-              '{prompt: $prompt, report: $report}' > gpt-payload.json
-
-    - name: Call Azure Function (GPT-4 Summary)
-      id: gpt
-      run: |
-        RESPONSE=$(curl -s -X POST "${{ secrets.GPT_FUNCTION_ENDPOINT }}" \
+        echo "Calling GPT-4 to analyze report..."
+        curl -X POST "$GPT4_ENDPOINT" \
+          -H "Authorization: Bearer $GPT4_API_KEY" \
           -H "Content-Type: application/json" \
-          --data-binary @gpt-payload.json)
-
-        echo "GPT_RESPONSE<<EOF" >> $GITHUB_ENV
-        echo "$RESPONSE" >> $GITHUB_ENV
-        echo "EOF" >> $GITHUB_ENV
-
-    - name: Display GPT Summary
-      run: echo "${{ env.GPT_RESPONSE }}"
+          -d '{
+                "role": "security expert",
+                "prompt": "You are a security expert. Analyze the following SonarQube report for vulnerabilities, reduce false positives, and summarize the findings in plain English.",
+                "report_path": "artifacts/report-task.txt"
+              }'
