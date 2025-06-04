@@ -24,7 +24,13 @@ jobs:
       run: dotnet tool install --global dotnet-sonarscanner
 
     - name: Begin SonarQube Scan
-      run: dotnet sonarscanner begin /k:"eshoponweb" /d:sonar.login="${{ secrets.SONAR_TOKEN }}" /d:sonar.host.url="http://13.89.226.182:9000"
+      run: dotnet sonarscanner begin /k:"eshoponweb" `
+        /d:sonar.login="${{ secrets.SONAR_TOKEN }}" `
+        /d:sonar.host.url="http://13.89.226.182:9000" `
+        /d:sonar.verbose=true `
+        /d:sonar.cs.roslyn.ignoreIssues=false `
+        /d:sonar.exclusions="**/obj/**,**/bin/**,**/*.json"
+
     
     - name: Build solution
       run: dotnet build eShopOnWeb.sln
