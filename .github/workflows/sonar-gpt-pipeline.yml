@@ -61,6 +61,14 @@ jobs:
           -H "Content-Type: application/json" \
           --data-binary @gpt-payload.json)
         echo "$RESPONSE" > gpt-summary.md
+        cat gpt-summary.md
+
+    - name: Check if GPT-4 Summary Exists
+      run: |
+        if [ ! -f gpt-summary.md ]; then
+          echo "Error: gpt-summary.md not found!"
+          exit 1
+        fi
 
     - name: Upload GPT-4 Summary as Artifact
       uses: actions/upload-artifact@v3
