@@ -36,7 +36,7 @@ jobs:
 
     
     - name: Build solution
-      run: dotnet build eShopOnWeb.sln
+      run: dotnet build eShopOnWeb.sln --no-incremental
 
     - name: End SonarQube Scan
       run: dotnet sonarscanner end /d:sonar.login="${{ secrets.SONAR_TOKEN }}"
