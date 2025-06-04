@@ -60,6 +60,10 @@ jobs:
         RESPONSE=$(curl -s -X POST "${{ secrets.GPT_FUNCTION_ENDPOINT }}" \
           -H "Content-Type: application/json" \
           --data-binary @gpt-payload.json)
+        if [ -z "$RESPONSE" ]; then
+          echo "Error: No response from GPT-4 API."
+          exit 1
+        fi
         echo "$RESPONSE" > gpt-summary.md
         cat gpt-summary.md
 
@@ -68,6 +72,8 @@ jobs:
         if [ ! -f gpt-summary.md ]; then
           echo "Error: gpt-summary.md not found!"
           exit 1
+        else
+          echo "gpt-summary.md found."
         fi
 
     - name: Upload GPT-4 Summary as Artifact
