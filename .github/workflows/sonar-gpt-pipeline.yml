@@ -23,7 +23,7 @@ jobs:
         run: dotnet tool install --global dotnet-sonarscanner
 
       - name: Begin SonarQube Scan
-        run: dotnet-sonarscanner begin /k:"YourProjectKey" /d:sonar.login="${{ secrets.SONAR_TOKEN }}" /d:sonar.host.url="http://<your-sonarqube-url>:9000"
+        run: dotnet-sonarscanner begin /k:"eshop-web-dotnet8" /d:sonar.login="${{ secrets.SONAR_TOKEN }}" /d:sonar.host.url="http://<your-sonarqube-url>:9000"
 
       - name: Build Solution
         run: dotnet build YourSolution.sln --no-incremental
