@@ -52,7 +52,7 @@ jobs:
     - name: Combine GPT Prompt with Report
       run: |
         REPORT=$(jq -c . < sonar-report.json)
-        echo "{\"prompt\": \"You are a senior security analyst. Analyze this SonarQube issue report. Group similar issues, reduce false positives, highlight critical risks, and provide remediation advice in markdown format.\", \"report\": $REPORT}" > gpt-payload.json
+        echo "{\"prompt\": \"You are a senior security analyst. Analyze this SonarQube issue report. Group similar issues, reduce false positives, highlight critical risks, and provide remediation advice.\", \"report\": $REPORT}" > gpt-payload.json
 
     - name: Call GPT-4 and Save Summary
       run: |
@@ -67,6 +67,9 @@ jobs:
         echo "Uploading GPT-4 summary to Azure Blob..."
         TIMESTAMP=$(date +%Y%m%d-%H%M%S)
         FILENAME="gpt-summary-${TIMESTAMP}.md"
-        curl -X PUT "${{ secrets.AZURE_BLOB_SAS_URL }}/${FILENAME}" \
+        BASE_URL="${{ secrets.AZURE_BLOB_SAS_URL%%\?* }}"
+        SAS_TOKEN="${{ secrets.AZURE_BLOB_SAS_URL#*\? }}"
+        FULL_URL="${BASE_URL}/${FILENAME}?${SAS_TOKEN}"
+        curl -X PUT "$FULL_URL" \
           -H "x-ms-blob-type: BlockBlob" \
           --data-binary @gpt-summary.md
