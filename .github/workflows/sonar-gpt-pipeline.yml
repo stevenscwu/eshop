@@ -209,9 +209,3 @@ jobs:
           curl -s -S -f -o /dev/null -w "%{http_code}" -X PUT "$FULL_URL" -H "x-ms-blob-type: BlockBlob" --data-binary @gpt-summary.md
           cp gpt-summary.md "report/${FILENAME}"
 
-      - name: Upload report directory as artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: security-analysis-reports-${{ github.run_id }}
-          path: report/
-          retention-days: 30
