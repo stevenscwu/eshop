@@ -41,18 +41,45 @@ jobs:
         dotnet sonarscanner end /d:sonar.login="${{ secrets.SONAR_TOKEN }}"
 
     - name: Wait for SonarQube to finalize
-      run: sleep 15
+      run: sleep 30
 
     - name: Download SonarQube Issues
       run: |
         curl -s -u "${{ secrets.SONAR_TOKEN }}:" \
-          "${{ secrets.SONAR_HOST_URL }}/api/issues/search?componentKeys=eshop-web-dotnet8" \
+          "${{ secrets.SONAR_HOST_URL }}/api/issues/search?componentKeys=eshop-web-dotnet8&ps=500" \
           -o sonar-report.json
+          
+    - name: Check SonarQube Report Content
+      run: |
+        echo "Checking SonarQube report content..."
+        if [ ! -s sonar-report.json ]; then
+          echo "ERROR: SonarQube report is empty"
+          exit 1
+        fi
+        echo "Report structure:"
+        jq 'keys' sonar-report.json || echo "Failed to parse JSON report"
 
     - name: Combine GPT Prompt with Report
       run: |
-        REPORT=$(jq -c . < sonar-report.json)
-        echo "{\"prompt\": \"You are a senior security analyst. Analyze this SonarQube issue report. Group similar issues, reduce false positives, highlight critical risks, and provide remediation advice.\", \"report\": $REPORT}" > gpt-payload.json
+        # Check if issues field exists in report, if not extract it from components or create an empty array
+        if jq -e '.issues' sonar-report.json > /dev/null 2>&1; then
+          echo "Issues field found in report"
+          ISSUES=$(jq -c '.issues' sonar-report.json)
+        else
+          echo "Issues field not found, will use empty array"
+          ISSUES="[]"
+        fi
+        
+        # Create a well-structured payload for GPT
+        echo "{
+          \"prompt\": \"You are a senior security analyst. Analyze this SonarQube issue report. Group similar issues, reduce false positives, highlight critical risks, and provide remediation advice.\", 
+          \"issues\": $ISSUES,
+          \"total\": $(jq '.total // 0' sonar-report.json),
+          \"components\": $(jq '.components // []' sonar-report.json)
+        }" > gpt-payload.json
+        
+        echo "Preview of GPT payload structure:"
+        jq 'keys' gpt-payload.json
 
     - name: Call GPT-4 and Save Summary
       run: |
@@ -60,18 +87,41 @@ jobs:
         RESPONSE=$(curl -s -X POST "${{ secrets.GPT_FUNCTION_ENDPOINT }}" \
           -H "Content-Type: application/json" \
           --data-binary @gpt-payload.json)
+          
+        # Check if we got a valid response
+        if [ -z "$RESPONSE" ]; then
+          echo "ERROR: Empty response from GPT-4 API"
+          exit 1
+        fi
+        
+        # Save response and print length for debugging
         echo "$RESPONSE" > gpt-summary.md
+        echo "Response length: $(wc -c < gpt-summary.md) bytes"
+        echo "Response preview:"
+        head -n 5 gpt-summary.md
 
     - name: Upload GPT-4 Summary to Azure Blob Storage
       run: |
+        echo "Checking summary file before upload..."
+        if [ ! -s gpt-summary.md ]; then
+          echo "WARNING: GPT summary file is empty, creating a placeholder message"
+          echo "# SonarQube Analysis Summary\n\nNo issues found in the SonarQube report or analysis failed.\nPlease check the pipeline logs for more details." > gpt-summary.md
+        fi
+        
         echo "Uploading GPT-4 summary to Azure Blob..."
         TIMESTAMP=$(date +%Y%m%d-%H%M%S)
         FILENAME="gpt-summary-${TIMESTAMP}.md"
+        
+        # Parse SAS URL safely
         BASE_URL="${AZURE_BLOB_SAS_URL%%\?*}"
         SAS_TOKEN="${AZURE_BLOB_SAS_URL#*\?}"
         FULL_URL="${BASE_URL}/${FILENAME}?${SAS_TOKEN}"
-        curl -X PUT "$FULL_URL" \
+        
+        # Upload with verbose output
+        curl -v -X PUT "$FULL_URL" \
           -H "x-ms-blob-type: BlockBlob" \
           --data-binary @gpt-summary.md
+          
+        echo "Upload completed for $FILENAME"
       env:
         AZURE_BLOB_SAS_URL: ${{ secrets.AZURE_BLOB_SAS_URL }}
