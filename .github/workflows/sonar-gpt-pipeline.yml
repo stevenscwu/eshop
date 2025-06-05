@@ -67,9 +67,11 @@ jobs:
         echo "Uploading GPT-4 summary to Azure Blob..."
         TIMESTAMP=$(date +%Y%m%d-%H%M%S)
         FILENAME="gpt-summary-${TIMESTAMP}.md"
-        BASE_URL="${{ secrets.AZURE_BLOB_SAS_URL%%\?* }}"
-        SAS_TOKEN="${{ secrets.AZURE_BLOB_SAS_URL#*\? }}"
+        BASE_URL="${AZURE_BLOB_SAS_URL%%\?*}"
+        SAS_TOKEN="${AZURE_BLOB_SAS_URL#*\?}"
         FULL_URL="${BASE_URL}/${FILENAME}?${SAS_TOKEN}"
         curl -X PUT "$FULL_URL" \
           -H "x-ms-blob-type: BlockBlob" \
           --data-binary @gpt-summary.md
+      env:
+        AZURE_BLOB_SAS_URL: ${{ secrets.AZURE_BLOB_SAS_URL }}
