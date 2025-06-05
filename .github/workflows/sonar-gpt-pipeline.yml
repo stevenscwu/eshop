@@ -48,8 +48,8 @@ jobs:
         curl -s -u "${{ secrets.SONAR_TOKEN }}:" \
           "${{ secrets.SONAR_HOST_URL }}/api/issues/search?componentKeys=eshop-web-dotnet8&ps=500" \
           -o sonar-report.json
-          
-    - name: Check SonarQube Report Content
+
+    - name: Verify SonarQube Report Content
       run: |
         echo "Checking SonarQube report content..."
         if [ ! -s sonar-report.json ]; then
@@ -58,6 +58,40 @@ jobs:
         fi
         echo "Report structure:"
         jq 'keys' sonar-report.json || echo "Failed to parse JSON report"
+        
+    - name: Upload SonarQube Raw Report to Azure Blob
+      run: |
+        echo "Uploading SonarQube report to Azure Blob..."
+        TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+        FILENAME="sonar-report-${TIMESTAMP}.json"
+        BASE_URL="${AZURE_BLOB_SAS_URL%%\?*}"
+        SAS_TOKEN="${AZURE_BLOB_SAS_URL#*\?}"
+        FULL_URL="${BASE_URL}/${FILENAME}?${SAS_TOKEN}"
+        curl -v -X PUT "$FULL_URL" \
+          -H "x-ms-blob-type: BlockBlob" \
+          --data-binary @sonar-report.json
+          
+        echo "SonarQube report uploaded: $FILENAME"
+      env:
+        AZURE_BLOB_SAS_URL: ${{ secrets.AZURE_BLOB_SAS_URL }}
+
+    - name: Upload GPT Function Configuration
+      run: |
+        echo "Checking GPT function configuration..."
+        echo "{\"endpoint\": \"${{ secrets.GPT_FUNCTION_ENDPOINT }}\"}" > gpt-config.json
+        
+        TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+        FILENAME="gpt-config-${TIMESTAMP}.json"
+        BASE_URL="${AZURE_BLOB_SAS_URL%%\?*}"
+        SAS_TOKEN="${AZURE_BLOB_SAS_URL#*\?}"
+        FULL_URL="${BASE_URL}/${FILENAME}?${SAS_TOKEN}"
+        curl -v -X PUT "$FULL_URL" \
+          -H "x-ms-blob-type: BlockBlob" \
+          --data-binary @gpt-config.json
+          
+        echo "GPT config info uploaded: $FILENAME"
+      env:
+        AZURE_BLOB_SAS_URL: ${{ secrets.AZURE_BLOB_SAS_URL }}
 
     - name: Combine GPT Prompt with Report
       run: |
@@ -80,25 +114,55 @@ jobs:
         
         echo "Preview of GPT payload structure:"
         jq 'keys' gpt-payload.json
+        
+        # Upload the payload for debugging
+        TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+        FILENAME="gpt-payload-${TIMESTAMP}.json"
+        BASE_URL="${AZURE_BLOB_SAS_URL%%\?*}"
+        SAS_TOKEN="${AZURE_BLOB_SAS_URL#*\?}"
+        FULL_URL="${BASE_URL}/${FILENAME}?${SAS_TOKEN}"
+        curl -v -X PUT "$FULL_URL" \
+          -H "x-ms-blob-type: BlockBlob" \
+          --data-binary @gpt-payload.json
+        
+        echo "GPT payload uploaded: $FILENAME"
+      env:
+        AZURE_BLOB_SAS_URL: ${{ secrets.AZURE_BLOB_SAS_URL }}
 
     - name: Call GPT-4 and Save Summary
       run: |
         echo "Calling GPT-4 to analyze SonarQube report..."
-        RESPONSE=$(curl -s -X POST "${{ secrets.GPT_FUNCTION_ENDPOINT }}" \
+        RESPONSE=$(curl -v -X POST "${{ secrets.GPT_FUNCTION_ENDPOINT }}" \
           -H "Content-Type: application/json" \
-          --data-binary @gpt-payload.json)
+          --data-binary @gpt-payload.json 2>&1)
+        
+        # Save full response including headers for debugging
+        echo "$RESPONSE" > gpt-full-response.txt
+        
+        # Upload the full response for debugging
+        TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+        FILENAME="gpt-full-response-${TIMESTAMP}.txt"
+        BASE_URL="${AZURE_BLOB_SAS_URL%%\?*}"
+        SAS_TOKEN="${AZURE_BLOB_SAS_URL#*\?}"
+        FULL_URL="${BASE_URL}/${FILENAME}?${SAS_TOKEN}"
+        curl -v -X PUT "$FULL_URL" \
+          -H "x-ms-blob-type: BlockBlob" \
+          --data-binary @gpt-full-response.txt
+          
+        # Extract just the response body for the summary
+        grep -v "^[<>]" gpt-full-response.txt | grep -v "^{" | grep -v "^}" > gpt-summary.md
           
         # Check if we got a valid response
-        if [ -z "$RESPONSE" ]; then
+        if [ ! -s gpt-summary.md ]; then
           echo "ERROR: Empty response from GPT-4 API"
-          exit 1
+          echo "# GPT-4 Analysis Failed\n\nThe GPT-4 API returned an empty response. Please check the full response log for details." > gpt-summary.md
+        else
+          echo "Response length: $(wc -c < gpt-summary.md) bytes"
+          echo "Response preview:"
+          head -n 5 gpt-summary.md
         fi
-        
-        # Save response and print length for debugging
-        echo "$RESPONSE" > gpt-summary.md
-        echo "Response length: $(wc -c < gpt-summary.md) bytes"
-        echo "Response preview:"
-        head -n 5 gpt-summary.md
+      env:
+        AZURE_BLOB_SAS_URL: ${{ secrets.AZURE_BLOB_SAS_URL }}
 
     - name: Upload GPT-4 Summary to Azure Blob Storage
       run: |
