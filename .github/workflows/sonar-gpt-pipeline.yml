@@ -115,7 +115,7 @@ jobs:
         id: prepare-payload
         run: |
           echo "Creating GPT-4 payload from SonarQube report..."
-          PROMPT_TEXT="You are a secure code reviewer with deep knowledge of software vulnerabilities. Given the following static analysis results from SonarQube (backend) and ESLint (frontend), perform the following tasks:\n\n1. Identify the top 10 most severe issues and explain why they are critical.\n2. Group issues by file/module and summarize their overall security and code quality state.\n3. Recommend specific refactoring or remediation actions for the top issues using secure coding best practices.\n4. Present your output in well-structured markdown, including:\n   - A prioritized issue summary table\n   - A per-module security assessment\n   - Actionable recommendations\n\nIf no issues are found, please state that clearly and suggest areas to look for potential issues that may not have been detected by the scan."
+          PROMPT_TEXT="You are a secure code reviewer with deep knowledge of software vulnerabilities. Given the following static analysis results from SonarQube (backend) and ESLint (frontend), perform a security review and highlight critical issues."
           if jq -e '.issues' sonar-report.json > /dev/null 2>&1; then
             ISSUES_JSON=$(jq -c '.issues // []' sonar-report.json)
           else
@@ -246,6 +246,11 @@ jobs:
           fi
         env:
           AZURE_BLOB_SAS_URL: ${{ secrets.AZURE_BLOB_SAS_URL }}
+
+      - name: List report directory contents
+        run: |
+          echo "Listing contents of report directory before artifact upload:"
+          ls -l report
 
       - name: Upload report directory as artifact
         uses: actions/upload-artifact@v3
