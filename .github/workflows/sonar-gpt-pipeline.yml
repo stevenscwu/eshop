@@ -1,260 +1,50 @@
-name: Fullstack Security Analysis with SonarQube + GPT-4 + Azure Blob Upload
+name: analyze
 
 on:
-  workflow_dispatch:
   push:
-    branches: [main]
+    branches:
+      - main
+  workflow_dispatch:
 
 jobs:
   analyze:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
 
-      - name: Setup .NET SDK
+      - name: Setup .NET
         uses: actions/setup-dotnet@v3
         with:
-          dotnet-version: '8.x'
+          dotnet-version: '8.0.x'
 
       - name: Install SonarScanner
         run: dotnet tool install --global dotnet-sonarscanner
 
-      - name: Install jq
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y jq
-
       - name: Begin SonarQube Scan
-        run: |
-          dotnet sonarscanner begin \
-            /k:"eshop-web-dotnet8" \
-            /d:sonar.login="${{ secrets.SONAR_TOKEN }}" \
-            /d:sonar.host.url="${{ secrets.SONAR_HOST_URL }}" \
-            /d:sonar.verbose=true \
-            /d:sonar.exclusions="**/obj/**,**/bin/**,**/*.json,**/BlazorAdmin/**,infra/core/database/sqlserver/**,infra/core/security/keyvault.bicep,infra/core/host/appservice.bicep"
+        run: dotnet-sonarscanner begin /k:"YourProjectKey" /d:sonar.login="${{ secrets.SONAR_TOKEN }}" /d:sonar.host.url="http://<your-sonarqube-url>:9000"
 
-      - name: Clean, Restore and Build
-        run: |
-          dotnet clean eShopOnWeb.sln
-          dotnet restore eShopOnWeb.sln
-          dotnet build eShopOnWeb.sln --no-incremental
+      - name: Build Solution
+        run: dotnet build YourSolution.sln --no-incremental
 
       - name: End SonarQube Scan
+        run: dotnet-sonarscanner end /d:sonar.login="${{ secrets.SONAR_TOKEN }}"
+
+      - name: Run ESLint for Frontend
         run: |
-          dotnet sonarscanner end /d:sonar.login="${{ secrets.SONAR_TOKEN }}"
+          cd client
+          npx eslint src/app/**/*.ts --config eslint.config.js --format json -o ../frontend_lint.json
 
-      - name: Wait for SonarQube to finalize
-        run: sleep 60
+      - name: Merge Sonar and ESLint results
+        run: python merge_reports.py
 
-      - name: Create report directory
-        run: mkdir -p report
-
-      - name: Download SonarQube Issues
+      - name: Invoke GPT-4 Summary via Azure Function
         run: |
-          echo "Downloading issues from SonarQube..."
-          PROJECT_KEY="eshop-web-dotnet8"
-          AUTH_HEADER="Authorization: Basic $(echo -n \"${{ secrets.SONAR_TOKEN }}:\" | base64)"
-          HTTP_STATUS=$(curl -s -o sonar-report.json -w "%{http_code}" \
-            -H "$AUTH_HEADER" \
-            "${{ secrets.SONAR_HOST_URL }}/api/issues/search?componentKeys=${PROJECT_KEY}&ps=500")
-          if [ "$HTTP_STATUS" -ne 200 ]; then
-            echo "ERROR: SonarQube API returned HTTP status $HTTP_STATUS"
-            cat sonar-report.json
-            exit 1
-          fi
+          curl -X POST           -H "Content-Type: application/json"           -d @sonar_issues.json           ${{ secrets.AZURE_FUNCTION_ENDPOINT }}
 
-      - name: Verify SonarQube Report Content
+      - name: Upload files to Azure Blob Storage
         run: |
-          echo "Checking SonarQube report content..."
-          if [ ! -s sonar-report.json ]; then
-            echo "WARNING: SonarQube report is empty"
-            echo '{"issues":[],"components":[],"total":0}' > sonar-report.json
-            echo "Created empty report structure to continue pipeline"
-          elif ! jq empty sonar-report.json 2>/dev/null; then
-            echo "ERROR: Failed to parse SonarQube report JSON"
-            cat sonar-report.json
-            echo '{"issues":[],"components":[],"total":0}' > sonar-report.json
-            echo "Created empty report structure to continue pipeline"
-          else
-            echo "Report structure:"
-            jq 'keys' sonar-report.json
-            echo "Total issues found: $(jq '.total // 0' sonar-report.json)"
-            echo "Issues count: $(jq '.issues | length // 0' sonar-report.json)"
-          fi
+          az storage blob upload --account-name ${{ secrets.AZURE_STORAGE_ACCOUNT }}                                  --container-name gpt-summaries                                  --name sonar_issues.json                                  --file sonar_issues.json                                  --sas-token "${{ secrets.AZURE_SAS_TOKEN }}"
 
-      - name: Upload SonarQube Raw Report to Azure Blob
-        run: |
-          echo "Uploading SonarQube report to Azure Blob..."
-          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-          FILENAME="sonar-report-${TIMESTAMP}.json"
-          SAS_URL="${{ secrets.AZURE_BLOB_SAS_URL }}"
-          BASE_URL=$(echo "$SAS_URL" | cut -d'?' -f1)
-          SAS_TOKEN=$(echo "$SAS_URL" | cut -d'?' -f2-)
-          if [ -z "$BASE_URL" ] || [ -z "$SAS_TOKEN" ]; then
-            echo "ERROR: Could not parse Azure Blob SAS URL"
-            exit 1
-          fi
-          FULL_URL="${BASE_URL}/${FILENAME}?${SAS_TOKEN}"
-          HTTP_STATUS=$(curl -s -S -f -o /dev/null -w "%{http_code}" \
-            -X PUT "$FULL_URL" \
-            -H "x-ms-blob-type: BlockBlob" \
-            --data-binary @sonar-report.json)
-          if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 300 ]; then
-            echo "SonarQube report successfully uploaded: $FILENAME"
-            cp sonar-report.json "report/${FILENAME}"
-          else
-            echo "WARNING: Azure upload returned HTTP status $HTTP_STATUS"
-          fi
-        env:
-          AZURE_BLOB_SAS_URL: ${{ secrets.AZURE_BLOB_SAS_URL }}
-
-      - name: Prepare GPT Payload
-        id: prepare-payload
-        run: |
-          echo "Creating GPT-4 payload from SonarQube report..."
-          PROMPT_TEXT="You are a secure code reviewer with deep knowledge of software vulnerabilities. Given the following static analysis results from SonarQube (backend) and ESLint (frontend), perform a security review and highlight critical issues."
-          if jq -e '.issues' sonar-report.json > /dev/null 2>&1; then
-            ISSUES_JSON=$(jq -c '.issues // []' sonar-report.json)
-          else
-            ISSUES_JSON="[]"
-          fi
-          TOTAL_JSON=$(jq -r '.total // 0' sonar-report.json)
-          if ! [[ "$TOTAL_JSON" =~ ^[0-9]+$ ]]; then
-            TOTAL_JSON="0"
-          fi
-          COMPONENTS_JSON=$(jq -c '.components // []' sonar-report.json)
-          if ! echo "$COMPONENTS_JSON" | jq -e 'if type == "array" then true else false end' > /dev/null 2>&1; then
-            COMPONENTS_JSON="[]"
-          fi
-          jq -n \
-            --arg prompt "$PROMPT_TEXT" \
-            --argjson issues "$ISSUES_JSON" \
-            --argjson total "$TOTAL_JSON" \
-            --argjson components "$COMPONENTS_JSON" \
-            '{prompt: $prompt, issues: $issues, total: $total, components: $components}' > gpt-payload.json
-          if jq empty gpt-payload.json 2>/dev/null; then
-            echo "gpt-payload.json is valid JSON"
-            echo "Payload size: $(wc -c < gpt-payload.json) bytes"
-            echo "Structure: $(jq 'keys' gpt-payload.json)"
-          else
-            echo "ERROR: Invalid JSON payload generated"
-            cat gpt-payload.json
-            exit 1
-          fi
-          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-          FILENAME="gpt-payload-${TIMESTAMP}.json"
-          SAS_URL="${{ secrets.AZURE_BLOB_SAS_URL }}"
-          BASE_URL=$(echo "$SAS_URL" | cut -d'?' -f1)
-          SAS_TOKEN=$(echo "$SAS_URL" | cut -d'?' -f2-)
-          FULL_URL="${BASE_URL}/${FILENAME}?${SAS_TOKEN}"
-          curl -s -S -f -X PUT "$FULL_URL" \
-            -H "x-ms-blob-type: BlockBlob" \
-            --data-binary @gpt-payload.json
-          echo "GPT payload uploaded: $FILENAME"
-          cp gpt-payload.json "report/${FILENAME}"
-        env:
-          AZURE_BLOB_SAS_URL: ${{ secrets.AZURE_BLOB_SAS_URL }}
-
-      - name: Call GPT-4 API
-        id: call-gpt4
-        run: |
-          echo "Calling GPT-4 to analyze SonarQube report..."
-          GPT_ENDPOINT="${{ secrets.GPT_FUNCTION_ENDPOINT }}"
-          if [ -z "$GPT_ENDPOINT" ]; then
-            echo "ERROR: GPT_FUNCTION_ENDPOINT secret is not set"
-            echo "# GPT-4 Analysis Failed\n\nThe GPT-4 API endpoint URL is not configured." > gpt-summary.md
-            exit 1
-          fi
-          for i in {1..3}; do
-            echo "Attempt $i to call GPT-4 API..."
-            HTTP_CODE=$(curl -s -o response.txt -w "%{http_code}" \
-              -X POST "$GPT_ENDPOINT" \
-              -H "Content-Type: application/json" \
-              -H "Accept: application/json" \
-              --data-binary @gpt-payload.json \
-              --max-time 120)
-            if [ "$HTTP_CODE" -eq 200 ]; then
-              echo "GPT-4 API call successful"
-              break
-            else
-              echo "GPT-4 API call failed with HTTP code $HTTP_CODE"
-              if [ "$i" -lt 3 ]; then
-                echo "Retrying in 10 seconds..."
-                sleep 10
-              else
-                echo "All retry attempts failed."
-                echo "# GPT-4 Analysis Failed\n\nThe GPT-4 API returned HTTP status code $HTTP_CODE.\n\nResponse body:\n\n\`\`\`\n$(cat response.txt)\n\`\`\`" > gpt-summary.md
-              fi
-            fi
-          done
-          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-          FILENAME="gpt-response-${TIMESTAMP}.txt"
-          SAS_URL="${{ secrets.AZURE_BLOB_SAS_URL }}"
-          BASE_URL=$(echo "$SAS_URL" | cut -d'?' -f1)
-          SAS_TOKEN=$(echo "$SAS_URL" | cut -d'?' -f2-)
-          FULL_URL="${BASE_URL}/${FILENAME}?${SAS_TOKEN}"
-          curl -s -S -f -X PUT "$FULL_URL" \
-            -H "x-ms-blob-type: BlockBlob" \
-            --data-binary @response.txt
-          echo "GPT response uploaded: $FILENAME"
-          cp response.txt "report/${FILENAME}"
-          if [ "$HTTP_CODE" -eq 200 ]; then
-            if grep -q "^#" response.txt || grep -q "^-" response.txt || grep -q "^\*" response.txt; then
-              cat response.txt > gpt-summary.md
-            else
-              if grep -q "^{" response.txt; then
-                echo "Detected JSON response, extracting content..."
-                jq -r '.content // .result // .markdown // .text // .' response.txt > gpt-summary.md
-              else
-                echo "# SonarQube Analysis Results\n\n" > gpt-summary.md
-                cat response.txt >> gpt-summary.md
-              fi
-            fi
-          fi
-          if [ ! -s gpt-summary.md ]; then
-            echo "WARNING: Empty summary created"
-            echo "# SonarQube Analysis Summary\n\nNo analysis results available. Please check the logs for details." > gpt-summary.md
-          else
-            echo "GPT-4 summary created with $(wc -l < gpt-summary.md) lines"
-            echo "First few lines of summary:"
-            head -n 5 gpt-summary.md
-          fi
-        env:
-          AZURE_BLOB_SAS_URL: ${{ secrets.AZURE_BLOB_SAS_URL }}
-
-      - name: Upload GPT-4 Summary to Azure Blob Storage
-        run: |
-          echo "Uploading GPT-4 summary to Azure Blob..."
-          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-          FILENAME="gpt-summary-${TIMESTAMP}.md"
-          SAS_URL="${{ secrets.AZURE_BLOB_SAS_URL }}"
-          BASE_URL=$(echo "$SAS_URL" | cut -d'?' -f1)
-          SAS_TOKEN=$(echo "$SAS_URL" | cut -d'?' -f2-)
-          FULL_URL="${BASE_URL}/${FILENAME}?${SAS_TOKEN}"
-          HTTP_STATUS=$(curl -s -S -f -o /dev/null -w "%{http_code}" \
-            -X PUT "$FULL_URL" \
-            -H "x-ms-blob-type: BlockBlob" \
-            --data-binary @gpt-summary.md)
-          if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 300 ]; then
-            echo "GPT-4 summary successfully uploaded: $FILENAME"
-            cp gpt-summary.md "report/${FILENAME}"
-          else
-            echo "WARNING: Azure upload returned HTTP status $HTTP_STATUS"
-          fi
-        env:
-          AZURE_BLOB_SAS_URL: ${{ secrets.AZURE_BLOB_SAS_URL }}
-
-      - name: List report directory contents
-        run: |
-          echo "Listing contents of report directory before artifact upload:"
-          ls -l report
-
-      - name: Upload report directory as artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: security-analysis-reports-${{ github.run_id }}
-          path: report/
-          retention-days: 30
+          az storage blob upload --account-name ${{ secrets.AZURE_STORAGE_ACCOUNT }}                                  --container-name gpt-summaries                                  --name summary.md                                  --file summary.md                                  --sas-token "${{ secrets.AZURE_SAS_TOKEN }}"
