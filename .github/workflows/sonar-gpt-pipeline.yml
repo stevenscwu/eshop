@@ -1,5 +1,4 @@
 # Security Analysis Pipeline with SonarQube + GPT-4 + Azure Blob Upload
-# Security Analysis Pipeline with SonarQube + GPT-4 + Azure Blob Upload
 name: Fullstack Security Analysis with SonarQube + GPT-4 + Azure Blob Upload
 
 on:
@@ -184,14 +183,7 @@ jobs:
         FILENAME="gpt-summary-${TIMESTAMP}.md"
         SAS_URL="${{ secrets.AZURE_BLOB_SAS_URL }}"
         BASE_URL=$(echo "$SAS_URL" | cut -d'?' -f1)
-        SAS_TOKEN=$(echo "$SAS_URL" | cut -d'?' -f2-)
-        FULL_URL="${BASE_URL}/${FILENAME}?${SAS_TOKEN}"
+        SAS_TOKEN=$(echo "$SAS_URL" | cut -d'?' -f2-)        FULL_URL="${BASE_URL}/${FILENAME}?${SAS_TOKEN}"
         curl -s -S -f -X PUT "$FULL_URL" -H "x-ms-blob-type: BlockBlob" --data-binary @gpt-summary.md
         cp gpt-summary.md "report/${FILENAME}"
-        
-    - name: Upload report directory as artifact
-      uses: actions/upload-artifact@v3
-      with:
-        name: security-analysis-reports-${{ github.run_id }}
-        path: report/
-        retention-days: 30
+        echo "All analysis results have been successfully uploaded to Azure Blob Storage"
