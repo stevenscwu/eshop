@@ -167,8 +167,16 @@ jobs:
           
           # Define chunk size (number of issues per chunk)
           # Adjust this value based on token limitations
-          CHUNK_SIZE=25
+          # Start with a smaller chunk size for safer processing
+          CHUNK_SIZE=15  # Reduced from 25 to 15 issues per chunk
           echo "CHUNK_SIZE=${CHUNK_SIZE}" >> $GITHUB_ENV
+          
+          # For very large reports, make chunks even smaller
+          if [ $TOTAL_ISSUES -gt 100 ]; then
+            CHUNK_SIZE=10
+            echo "Large report detected ($TOTAL_ISSUES issues). Adjusted chunk size to $CHUNK_SIZE"
+            echo "CHUNK_SIZE=${CHUNK_SIZE}" >> $GITHUB_ENV
+          fi
           
           # Calculate number of chunks needed
           CHUNKS=$(( (TOTAL_ISSUES + CHUNK_SIZE - 1) / CHUNK_SIZE ))
@@ -231,12 +239,21 @@ jobs:
               
               # Set dynamic timeout based on chunk size
               CHUNK_SIZE_BYTES=$(wc -c < "$CHUNK_FILE")
-              if [ "$CHUNK_SIZE_BYTES" -gt 1000000 ]; then
+              # More progressive timeout scaling based on payload size
+              if [ "$CHUNK_SIZE_BYTES" -gt 2000000 ]; then
+                  TIMEOUT=$((BASE_TIMEOUT * 4))
+              elif [ "$CHUNK_SIZE_BYTES" -gt 1000000 ]; then
                   TIMEOUT=$((BASE_TIMEOUT * 2))
               else
                   TIMEOUT=$BASE_TIMEOUT
               fi
               echo "Chunk size: $CHUNK_SIZE_BYTES bytes, timeout: $TIMEOUT seconds"
+              
+              # Verify chunk file is valid JSON
+              if ! jq empty "$CHUNK_FILE" > /dev/null 2>&1; then
+                echo "ERROR: Chunk payload is not valid JSON"
+                return 1
+              fi
               
               # Process with retries and backoff
               for try in $(seq 1 $MAX_RETRIES); do
@@ -246,8 +263,11 @@ jobs:
                       sleep $SLEEP_TIME
                   fi
                   
-                  # Call the GPT-4 API
-                  HTTP_CODE=$(curl -s -o "$OUTPUT_FILE" -w "%{http_code}" \
+                  # Debug log the chunk size and endpoint
+                  echo "Submitting chunk of $(wc -c < "$CHUNK_FILE") bytes to GPT API"
+                  
+                  # Call the GPT-4 API with verbose flag for more debugging info
+                  HTTP_CODE=$(curl -v -s -o "$OUTPUT_FILE" -w "%{http_code}" \
                       -X POST "${GPT_FUNCTION_ENDPOINT}" \
                       -H "Content-Type: application/json" \
                       --data-binary @"$CHUNK_FILE" \
@@ -256,20 +276,30 @@ jobs:
                   if [ "$HTTP_CODE" -eq 200 ]; then
                       echo "Chunk ${CHUNK_INDEX} processed successfully"
                       
-                      # Process response - similar to original pipeline
+                      # Save raw response for debugging
+                      cp "$OUTPUT_FILE" "${RESULTS_DIR}/raw-response-${CHUNK_INDEX}.json"
+                      
+                      # Process response - enhanced parsing logic
                       if grep -q "^#" "$OUTPUT_FILE"; then
+                          echo "Found markdown response"
                           # Direct markdown response
                           cat "$OUTPUT_FILE" > "$SUMMARY_FILE"
                       elif grep -q "^{" "$OUTPUT_FILE"; then
-                          # Extract JSON content
-                          if jq -r '.content // .result // .markdown // .text // .' "$OUTPUT_FILE" > "$SUMMARY_FILE" 2>/dev/null; then
+                          echo "Found JSON response"
+                          # Log JSON structure for debugging
+                          jq 'keys' "$OUTPUT_FILE" > "${RESULTS_DIR}/keys-${CHUNK_INDEX}.txt"
+                          
+                          # Extract JSON content - try multiple field patterns
+                          if jq -r '.content // .result // .markdown // .text // .analysis // .output // .response // .' "$OUTPUT_FILE" > "$SUMMARY_FILE" 2>/dev/null; then
                               echo "Extracted content from JSON response for chunk ${CHUNK_INDEX}"
                           else
                               # Fall back to raw response if JSON extraction fails
+                              echo "JSON extraction failed - using raw output"
                               echo "# GPT-4 Analysis: Chunk ${CHUNK_INDEX}" > "$SUMMARY_FILE"
                               cat "$OUTPUT_FILE" >> "$SUMMARY_FILE"
                           fi
                       else
+                          echo "Found plain text response"
                           # Raw text response
                           echo "# GPT-4 Analysis: Chunk ${CHUNK_INDEX}" > "$SUMMARY_FILE"
                           cat "$OUTPUT_FILE" >> "$SUMMARY_FILE"
@@ -383,19 +413,33 @@ jobs:
           else
               echo "Using GPT to synthesize results from ${CHUNKS} chunks"
               
-              # Prepare summaries for the final prompt
+              # Prepare summaries for the final prompt, properly escaped
               CHUNK_SUMMARIES=""
               for (( i=0; i<$CHUNKS; i++ ))
               do
                   CHUNK_SUMMARY="${RESULTS_DIR}/gpt-summary-${i}.md"
                   if [ -f "$CHUNK_SUMMARY" ]; then
-                      CHUNK_SUMMARIES="${CHUNK_SUMMARIES}## Chunk $((i + 1)) Summary\n\n$(cat ${CHUNK_SUMMARY})\n\n---\n\n"
+                      # Create a clean summary with proper escaping to avoid sed issues
+                      TEMP_SUMMARY="${RESULTS_DIR}/temp-summary-${i}.txt"
+                      cat "$CHUNK_SUMMARY" | sed 's/\\/\\\\/g; s/\//\\\//g; s/&/\\&/g' > "$TEMP_SUMMARY"
+                      CHUNK_SUMMARIES="${CHUNK_SUMMARIES}## Chunk $((i + 1)) Summary\n\n$(cat ${TEMP_SUMMARY})\n\n---\n\n"
                   fi
               done
               
               # Prepare the final GPT prompt for synthesizing results
               FINAL_PROMPT_FILE="${RESULTS_DIR}/final-prompt-${TIMESTAMP}.txt"
-              sed "s/{CHUNK_SUMMARIES}/${CHUNK_SUMMARIES}/g" final-prompt.txt > "$FINAL_PROMPT_FILE"
+              # Use perl instead of sed for more reliable replacement of multi-line content
+              perl -e '
+                  local $/;
+                  open(my $template, "<", "final-prompt.txt");
+                  my $content = <$template>;
+                  close($template);
+                  my $summaries = $ENV{"CHUNK_SUMMARIES"};
+                  $content =~ s/\{CHUNK_SUMMARIES\}/$summaries/g;
+                  open(my $out, ">", "'"${FINAL_PROMPT_FILE}"'");
+                  print $out $content;
+                  close($out);
+              '
               
               # Create payload for final GPT call
               jq -n \
@@ -413,30 +457,47 @@ jobs:
                       sleep $SLEEP_TIME
                   fi
                   
-                  # Call the GPT-4 API for final synthesis
-                  HTTP_CODE=$(curl -s -o "${RESULTS_DIR}/final-response-${TIMESTAMP}.txt" -w "%{http_code}" \
+                  # Debug log the final synthesis payload size
+                  echo "Submitting final synthesis of $(wc -c < "${RESULTS_DIR}/final-gpt-payload-${TIMESTAMP}.json") bytes to GPT API"
+                  
+                  # Save a copy of the final prompt for debugging
+                  cp "${FINAL_PROMPT_FILE}" "${RESULTS_DIR}/final-prompt-debug-${TIMESTAMP}.txt"
+                  
+                  # Call the GPT-4 API for final synthesis with verbose logging
+                  HTTP_CODE=$(curl -v -s -o "${RESULTS_DIR}/final-response-${TIMESTAMP}.txt" -w "%{http_code}" \
                       -X POST "${GPT_FUNCTION_ENDPOINT}" \
                       -H "Content-Type: application/json" \
+                      -H "Accept: application/json" \
                       --data-binary @"${RESULTS_DIR}/final-gpt-payload-${TIMESTAMP}.json" \
                       --max-time $TIMEOUT 2> "${RESULTS_DIR}/final-curl-error-${TIMESTAMP}.txt")
                   
                   if [ "$HTTP_CODE" -eq 200 ]; then
                       echo "Final synthesis completed successfully"
                       
-                      # Process response
+                      # Save raw response for debugging
+                      cp "${RESULTS_DIR}/final-response-${TIMESTAMP}.txt" "${RESULTS_DIR}/final-raw-response-${TIMESTAMP}.json"
+                      
+                      # Process response with enhanced parsing logic
                       if grep -q "^#" "${RESULTS_DIR}/final-response-${TIMESTAMP}.txt"; then
+                          echo "Found markdown response"
                           # Direct markdown response
                           cat "${RESULTS_DIR}/final-response-${TIMESTAMP}.txt" > "$COMBINED_SUMMARY"
                       elif grep -q "^{" "${RESULTS_DIR}/final-response-${TIMESTAMP}.txt"; then
-                          # Extract JSON content
-                          if jq -r '.content // .result // .markdown // .text // .' "${RESULTS_DIR}/final-response-${TIMESTAMP}.txt" > "$COMBINED_SUMMARY" 2>/dev/null; then
+                          echo "Found JSON response"
+                          # Log JSON structure for debugging
+                          jq 'keys' "${RESULTS_DIR}/final-response-${TIMESTAMP}.txt" > "${RESULTS_DIR}/final-keys-${TIMESTAMP}.txt" 2>/dev/null
+                          
+                          # Extract JSON content with more field patterns
+                          if jq -r '.content // .result // .markdown // .text // .analysis // .output // .response // .message.content // .choices[0].message.content // .' "${RESULTS_DIR}/final-response-${TIMESTAMP}.txt" > "$COMBINED_SUMMARY" 2>/dev/null; then
                               echo "Extracted content from JSON response for final synthesis"
                           else
                               # Fall back to raw response
+                              echo "JSON extraction failed - using raw output"
                               echo "# GPT-4 Combined Security Analysis" > "$COMBINED_SUMMARY"
                               cat "${RESULTS_DIR}/final-response-${TIMESTAMP}.txt" >> "$COMBINED_SUMMARY"
                           fi
                       else
+                          echo "Found plain text response"
                           # Raw text response
                           echo "# GPT-4 Combined Security Analysis" > "$COMBINED_SUMMARY"
                           cat "${RESULTS_DIR}/final-response-${TIMESTAMP}.txt" >> "$COMBINED_SUMMARY"
@@ -473,9 +534,28 @@ jobs:
               done
           fi
           
+          # Create a metadata file with diagnostic information
+          METADATA_FILE="${RESULTS_DIR}/pipeline-metadata-${TIMESTAMP}.json"
+          jq -n \
+            --arg timestamp "$(date)" \
+            --arg chunkSize "$CHUNK_SIZE" \
+            --arg totalIssues "$TOTAL_ISSUES" \
+            --arg chunks "$CHUNKS" \
+            --arg successChunks "$SUCCESS_CHUNKS" \
+            --arg failedChunks "$FAILED_CHUNKS" \
+            '{
+              "timestamp": $timestamp,
+              "totalIssues": $totalIssues,
+              "chunkSize": $chunkSize,
+              "totalChunks": $chunks,
+              "successfulChunks": $successChunks,
+              "failedChunks": $failedChunks
+            }' > "$METADATA_FILE"
+            
           # Also save a copy in the root for easy access
           cp "$COMBINED_SUMMARY" "gpt-summary.md"
           echo "Final combined report saved to gpt-summary.md and $COMBINED_SUMMARY"
+          echo "Execution metadata saved to $METADATA_FILE"
 
       - name: Upload Final Report to Azure Blob Storage
         env:
