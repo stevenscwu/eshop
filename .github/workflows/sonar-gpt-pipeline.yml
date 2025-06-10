@@ -1,5 +1,3 @@
-# Security Analysis Pipeline with SonarQube + GPT-4 + Azure Blob Upload
-# Enhanced with report chunking to handle large SonarQube reports exceeding GPT-4 token limits
 name: Fullstack Security Analysis with SonarQube + GPT-4 (Chunked)
 
 on:
@@ -42,7 +40,6 @@ jobs:
 
       - name: Clean, Restore and Build
         run: |
-          # Explicitly specify solution file to avoid "more than one project" error
           dotnet clean eShopOnWeb.sln
           dotnet restore eShopOnWeb.sln
           dotnet build eShopOnWeb.sln --no-incremental
@@ -85,16 +82,10 @@ jobs:
             echo "Created empty report template"
           fi
           
-          # Log report information for diagnostics
           ISSUE_COUNT=$(jq '.issues | length' sonar-report.json)
           COMPONENT_COUNT=$(jq '.components | length' sonar-report.json)
           TOTAL_COUNT=$(jq '.total' sonar-report.json)
           echo "SonarQube report contains: $ISSUE_COUNT issues, $COMPONENT_COUNT components, $TOTAL_COUNT total reported issues"
-          
-          # Check for empty/incomplete report
-          if [ "$ISSUE_COUNT" -eq 0 ]; then
-            echo "WARNING: No issues found in SonarQube report. This might cause problems with the GPT analysis."
-          fi
 
       - name: Upload SonarQube Raw Report to Azure Blob
         env:
@@ -108,81 +99,59 @@ jobs:
           SAS_TOKEN=$(echo "$SAS_URL" | cut -d'?' -f2-)
           FULL_URL="${BASE_URL}/${FILENAME}?${SAS_TOKEN}"
           curl -s -S -f -X PUT "$FULL_URL" -H "x-ms-blob-type: BlockBlob" --data-binary @sonar-report-pretty.json
-          
-          FOLDER_DATE=$(date +%Y%m%d)
-          cp sonar-report-pretty.json "report/${FOLDER_DATE}/${FILENAME}"
-          echo "SonarQube report saved to report/${FOLDER_DATE}/${FILENAME}"
+          cp sonar-report-pretty.json "report/$(date +%Y%m%d)/${FILENAME}"
+          echo "SonarQube report saved as $FILENAME"
 
-      - name: Create Base GPT Prompt
+      - name: Create report directory structure and export variables
         run: |
-          # Create ultra-minimal prompt to prevent 504 Gateway Timeout errors
-          cat > base-prompt.txt << 'EOT'
-          Analyze SonarQube issue(s) (chunk {CHUNK_NUM}/{TOTAL_CHUNKS}):
-          - List severity
-          - File location
-          - Fix recommendation
-          Extremely brief! 1-2 sentences per issue. Use bullet points only.
-          EOT
-          
-          # Create minimal final prompt template
-          cat > final-prompt.txt << 'EOT'
-          Create security summary from SonarQube analyses:
-          1. Most critical issues first
-          2. Group by module/file
-          3. Brief fix recommendations
-          
-          BE EXTREMELY CONCISE. Use bullet points only. Max 2-3 sentences per issue.
-          
-          {CHUNK_SUMMARIES}
-          EOT
-          
-          # Create an emergency simplified template for cases with few successful chunks
-          cat > emergency-prompt.txt << 'EOT'
-          Create a brief security report from limited SonarQube analysis:
-
-          1. Summarize the detected issues
-          2. Provide general security recommendations
-          
-          Be extremely concise.
-          
-          {CHUNK_SUMMARIES}
-          EOT
-
-      - name: Split SonarQube report into chunks for GPT processing
-        run: |
-          # Export environment variables for use in all steps
+          # Create timestamp for this run
           FOLDER_DATE=$(date +%Y%m%d)
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          
+          # Define directories for chunks and results
           CHUNKS_DIR="report/${FOLDER_DATE}/chunks"
           RESULTS_DIR="report/${FOLDER_DATE}/results"
+          
+          # Create directory structure
+          mkdir -p "$CHUNKS_DIR"
+          mkdir -p "$RESULTS_DIR"
+          
+          # Export variables for use in subsequent steps
           echo "FOLDER_DATE=${FOLDER_DATE}" >> $GITHUB_ENV
+          echo "TIMESTAMP=${TIMESTAMP}" >> $GITHUB_ENV
           echo "CHUNKS_DIR=${CHUNKS_DIR}" >> $GITHUB_ENV
           echo "RESULTS_DIR=${RESULTS_DIR}" >> $GITHUB_ENV
           
+          # Create base prompt file
+          cp .github/workflows/base-prompt.txt base-prompt.txt
+
+      - name: Split SonarQube report into chunks for GPT processing
+        run: |
           # Extract issues and components separately
           jq '.issues' sonar-report.json > all-issues.json
           jq '.components' sonar-report.json > all-components.json
           
-          # Get total issues count to calculate chunks
-          TOTAL_ISSUES=$(jq 'length' all-issues.json)
-          echo "Total issues: ${TOTAL_ISSUES}"
+          # Count issues
+          TOTAL_ISSUES=$(jq '. | length' all-issues.json)
+          echo "Total issues: $TOTAL_ISSUES"
           echo "TOTAL_ISSUES=${TOTAL_ISSUES}" >> $GITHUB_ENV
           
           # Define chunk size (number of issues per chunk)
-          # Use ultra-small chunks to prevent timeouts
-          CHUNK_SIZE=1  # Use single-issue chunks by default to prevent 504 Gateway Timeout errors
+          # Use single-issue chunks by default to prevent timeout errors
+          CHUNK_SIZE=1
           echo "CHUNK_SIZE=${CHUNK_SIZE}" >> $GITHUB_ENV
-          
-          # For very small reports, we can process 2 issues per chunk
-          if [ $TOTAL_ISSUES -lt 50 ]; then
-            CHUNK_SIZE=2
-            echo "Small report detected ($TOTAL_ISSUES issues). Using chunk size of $CHUNK_SIZE"
-            echo "CHUNK_SIZE=${CHUNK_SIZE}" >> $GITHUB_ENV
-          fi
           
           # Calculate number of chunks needed
           CHUNKS=$(( (TOTAL_ISSUES + CHUNK_SIZE - 1) / CHUNK_SIZE ))
           echo "Splitting into ${CHUNKS} chunks of ~${CHUNK_SIZE} issues each"
           echo "CHUNKS=${CHUNKS}" >> $GITHUB_ENV
+          
+          # Create ultra-minimal prompt to prevent 504 Gateway Timeout errors
+          echo "Analyze SonarQube issue(s) (chunk {CHUNK_NUM}/{TOTAL_CHUNKS}):" > base-prompt.txt
+          echo "- List severity" >> base-prompt.txt
+          echo "- File location" >> base-prompt.txt 
+          echo "- Fix recommendation" >> base-prompt.txt
+          echo "Extremely brief! 1-2 sentences per issue. Use bullet points only." >> base-prompt.txt
           
           # Create chunks by slicing the issues array
           for (( i=0; i<$CHUNKS; i++ ))
@@ -191,25 +160,19 @@ jobs:
               # Create a JSON containing a slice of the issues array
               jq -c ".[$START:$(( START + CHUNK_SIZE ))]" all-issues.json > "${CHUNKS_DIR}/issues-chunk-${i}.json"
               
-              # Create the full chunk payload for GPT
-              CHUNK_NUM=$((i + 1))
-              
               # Prepare chunk-specific prompt by replacing placeholders
+              CHUNK_NUM=$((i + 1))
               sed "s/{CHUNK_NUM}/$CHUNK_NUM/g; s/{TOTAL_CHUNKS}/$CHUNKS/g" base-prompt.txt > "${CHUNKS_DIR}/prompt-${i}.txt"
               
-              # For very large reports, include only essential fields in the issues
-              if [ $TOTAL_ISSUES -gt 100 ]; then
-                  echo "Optimizing issue data for large report"
-                  # Create a streamlined version of the issues with only essential fields
-                  jq '[.[] | {key, rule, component, severity, message, line, textRange}]' "${CHUNKS_DIR}/issues-chunk-${i}.json" > "${CHUNKS_DIR}/issues-optimized-${i}.json"
-                  mv "${CHUNKS_DIR}/issues-optimized-${i}.json" "${CHUNKS_DIR}/issues-chunk-${i}.json"
-              fi
+              # Create ultra-minimal issue payload
+              echo "Optimizing issue data to prevent timeouts"
+              jq '[.[] | {key, rule, severity, component, message}]' "${CHUNKS_DIR}/issues-chunk-${i}.json" > "${CHUNKS_DIR}/issues-optimized-${i}.json"
+              mv "${CHUNKS_DIR}/issues-optimized-${i}.json" "${CHUNKS_DIR}/issues-chunk-${i}.json"
               
               # Create streamlined components (only include keys and paths)
               jq '[.[] | {key, path}]' all-components.json > "${CHUNKS_DIR}/components-optimized.json"
               
-              # Create an ultra-minimal payload focused on essential data only
-              # This dramatically reduces token count to avoid 504 Gateway Timeout
+              # Create the GPT payload for this chunk with ultra-minimal format
               jq -n \
                 --slurpfile issues "${CHUNKS_DIR}/issues-chunk-${i}.json" \
                 --rawfile prompt "${CHUNKS_DIR}/prompt-${i}.txt" \
@@ -248,12 +211,12 @@ jobs:
           fi
           
           echo "Successfully split SonarQube report into $CHUNKS chunks"
-
+          
       - name: Process chunks with GPT-4 API
         env:
-          GPT_FUNCTION_ENDPOINT: ${{ secrets.GPT_FUNCTION_ENDPOINT }}
-          AZURE_BLOB_SAS_URL: ${{ secrets.AZURE_BLOB_SAS_URL }}
+          GPT_FUNCTION_ENDPOINT: ${{ secrets.AZURE_FUNCTION_URL }}
         run: |
+          # Define retry parameters
           MAX_RETRIES=3
           BASE_TIMEOUT=120
           TIMESTAMP=$(date +%Y%m%d-%H%M%S)
@@ -269,11 +232,18 @@ jobs:
               
               echo "Processing chunk ${CHUNK_INDEX} (Attempt 1/${MAX_RETRIES})"
               
-              # Set fixed short timeout to avoid server timeouts (504 Gateway Timeout)
+              # Set dynamic timeout based on chunk size
               CHUNK_SIZE_BYTES=$(wc -c < "$CHUNK_FILE")
-              # Use a shorter fixed timeout for all requests regardless of size
-              # This forces the client to timeout before the server times out with 504
-              TIMEOUT=60
+              # More progressive timeout scaling based on payload size
+              if [ "$CHUNK_SIZE_BYTES" -gt 2000000 ]; then
+                  TIMEOUT=$((BASE_TIMEOUT * 5))
+              elif [ "$CHUNK_SIZE_BYTES" -gt 1000000 ]; then
+                  TIMEOUT=$((BASE_TIMEOUT * 3))
+              elif [ "$CHUNK_SIZE_BYTES" -gt 500000 ]; then
+                  TIMEOUT=$((BASE_TIMEOUT * 2))
+              else
+                  TIMEOUT=$BASE_TIMEOUT
+              fi
               echo "Chunk size: $CHUNK_SIZE_BYTES bytes, timeout: $TIMEOUT seconds"
               
               # Verify chunk file is valid JSON
@@ -297,809 +267,232 @@ jobs:
                       sleep $SLEEP_TIME
                   fi
                   
-                  # Debug log the chunk size and endpoint
-                  echo "Submitting chunk of $(wc -c < "$CHUNK_FILE") bytes to GPT API"
-                  
-                  # Save a sample of the payload for diagnostics (first 1000 characters)
-                  head -c 1000 "$CHUNK_FILE" > "${RESULTS_DIR}/payload-sample-${CHUNK_INDEX}.json"
-                  
-                  # Call the GPT-4 API with simplified payload for better reliability
-                  # First create a ultra simplified version for this attempt
-                  jq '{
-                    prompt: .prompt,
-                    issues: (.issues | map({
-                      key,
-                      rule,
-                      severity,
-                      component,
-                      message: (.message | if length > 300 then (.message[0:300] + "...") else . end)
-                    }) | limit(5)),
-                    components: [.components[0]]
-                  }' "$CHUNK_FILE" > "${CHUNKS_DIR}/ultra-simple-${CHUNK_INDEX}-${try}.json"
-                  
-                  # Use the simplified payload if it was created successfully 
-                  if [ -s "${CHUNKS_DIR}/ultra-simple-${CHUNK_INDEX}-${try}.json" ]; then
-                    echo "Using simplified payload for attempt ${try}: $(wc -c < "${CHUNKS_DIR}/ultra-simple-${CHUNK_INDEX}-${try}.json") bytes"
-                    SUBMIT_FILE="${CHUNKS_DIR}/ultra-simple-${CHUNK_INDEX}-${try}.json"
-                  else 
-                    SUBMIT_FILE="$CHUNK_FILE"
-                  fi
-
-                  # Call the API with enhanced timeout detection and handling
-                  # Use lower client timeout to detect server timeouts earlier
-                  # This avoids waiting for the full 504 Gateway Timeout to occur
-                  HTTP_CODE=$(curl -v -i -s -o "$OUTPUT_FILE" -w "%{http_code}" \
+                  # Call the GPT-4 API with verbose flag for more debugging info
+                  HTTP_CODE=$(curl -v -s -o "$RESPONSE_LOG_FILE" -w "%{http_code}" \
                       -X POST "${GPT_FUNCTION_ENDPOINT}" \
                       -H "Content-Type: application/json" \
-                      -H "Accept: application/json" \
-                      -H "User-Agent: SonarGPT-Chunked/1.0" \
-                      -H "X-Function-Timeout-Override: 25" \
-                      --connect-timeout 15 \
-                      --data-binary @"$SUBMIT_FILE" \
-                      --max-time $TIMEOUT 2> "${ERROR_LOG_FILE}")
-                      
-                  # Check for timeout conditions in the error log
-                  if grep -q "Operation timed out" "${ERROR_LOG_FILE}" || \
-                     grep -q "Connection timed out" "${ERROR_LOG_FILE}" || \
-                     [ "$HTTP_CODE" -eq 504 ] || [ "$HTTP_CODE" -eq 0 ]; then
-                      echo "TIMEOUT DETECTED: API request timed out or returned 504"
-                      # Force handling as a 504 Gateway Timeout
-                      HTTP_CODE=504
-                  fi
-                      
+                      --data-binary @"$CHUNK_FILE" \
+                      --max-time $TIMEOUT 2> "$ERROR_LOG_FILE")
+                  
+                  # Check if call was successful
                   if [ "$HTTP_CODE" -eq 200 ]; then
-                  echo "Chunk ${CHUNK_INDEX} processed successfully"
-                  
-                  # Save raw response for debugging
-                  cp "$OUTPUT_FILE" "${RESULTS_DIR}/raw-response-${CHUNK_INDEX}.json"
-                  
-                  # Extract HTTP body (skip headers) for cleaner processing
-                  # Look for blank line that separates HTTP headers from body
-                  awk 'BEGIN {body=0} /^\r?$/ {body=1; next} {if (body) print $0}' "$OUTPUT_FILE" > "$RESPONSE_LOG_FILE"
-                  
-                  # Process response - enhanced parsing logic with better error handling
-                  if grep -q "^#" "$RESPONSE_LOG_FILE"; then
-                      echo "Found markdown response"
-                      # Direct markdown response
-                      cat "$RESPONSE_LOG_FILE" > "$SUMMARY_FILE"
-                  elif grep -q "^{" "$RESPONSE_LOG_FILE"; then
-                      echo "Found JSON response"
-                      # Log JSON structure for debugging
-                      jq 'keys' "$RESPONSE_LOG_FILE" > "${RESULTS_DIR}/keys-${CHUNK_INDEX}.txt" 2>/dev/null || echo "Failed to extract JSON keys"
-                      
-                      # Try more comprehensive field extraction patterns
-                      if jq -r '.content // .result // .markdown // .text // .analysis // .output // .response // .choices[0].message.content // .message.content // .' "$RESPONSE_LOG_FILE" > "$SUMMARY_FILE" 2>/dev/null; then
-                          echo "Extracted content from JSON response for chunk ${CHUNK_INDEX}"
-                          
-                          # Verify the summary file has meaningful content
-                          if [ ! -s "$SUMMARY_FILE" ]; then
-                              echo "Warning: Extracted content is empty, falling back to raw response"
-                              echo "# GPT-4 Analysis: Chunk ${CHUNK_INDEX}" > "$SUMMARY_FILE"
-                              cat "$RESPONSE_LOG_FILE" >> "$SUMMARY_FILE"
-                          fi
+                      # Check if response contains actual content (not just whitespace)
+                      if [ -s "$RESPONSE_LOG_FILE" ] && grep -q '[a-zA-Z0-9]' "$RESPONSE_LOG_FILE"; then
+                          # Copy the response to the final summary file
+                          cp "$RESPONSE_LOG_FILE" "$SUMMARY_FILE"
+                          echo "Successfully processed chunk ${CHUNK_INDEX} (Attempt ${try}/${MAX_RETRIES})"
+                          return 0
                       else
-                          # Fall back to raw response if JSON extraction fails
-                          echo "JSON extraction failed - using raw output"
-                          echo "# GPT-4 Analysis: Chunk ${CHUNK_INDEX}" > "$SUMMARY_FILE"
-                          cat "$RESPONSE_LOG_FILE" >> "$SUMMARY_FILE"
+                          echo "Warning: Empty or whitespace-only response from API for chunk ${CHUNK_INDEX}"
+                          # Continue to the next retry
                       fi
                   else
-                      echo "Found plain text response"
-                      # Raw text response
-                      echo "# GPT-4 Analysis: Chunk ${CHUNK_INDEX}" > "$SUMMARY_FILE"
-                      cat "$RESPONSE_LOG_FILE" >> "$SUMMARY_FILE"
-                  fi
-                      
-                      echo "Chunk ${CHUNK_INDEX} analysis saved to $SUMMARY_FILE"
-                      return 0              else
-                  echo "API request failed for chunk ${CHUNK_INDEX} with HTTP code ${HTTP_CODE} (attempt ${try})"
-                  echo "Error details:"
-                  cat "${ERROR_LOG_FILE}"
-                  
-                  # Extract HTTP response body for easier debugging
-                  if [ -s "$OUTPUT_FILE" ]; then
-                      echo "Error response content (first 1000 bytes):"
-                      # Extract body portion after headers
-                      awk 'BEGIN {body=0} /^\r?$/ {body=1; next} {if (body) print $0}' "$OUTPUT_FILE" | head -c 1000 > "${RESULTS_DIR}/error-body-${CHUNK_INDEX}-attempt-${try}.txt"
-                      cat "${RESULTS_DIR}/error-body-${CHUNK_INDEX}-attempt-${try}.txt"
-                      echo "..."
-                  fi
-                  
-                  # For certain error codes, try to modify the request for next attempt
-                  if [ "$HTTP_CODE" -eq 413 ] || [ "$HTTP_CODE" -eq 429 ] || [ "$HTTP_CODE" -eq 500 ] || [ "$HTTP_CODE" -eq 504 ]; then
-                      # For payload too large (413), rate limiting (429), server error (500) or 504 Gateway Timeout
-                      # Save the original payload size for diagnostics
-                      CHUNK_SIZE_BYTES=$(wc -c < "$CHUNK_FILE")
-                      echo "Detected critical error code $HTTP_CODE - creating micro-payload"
-                      
-                      if [ $try -lt $MAX_RETRIES ]; then
-                          # Create an ultra-minimal payload with bare essentials only
-                          echo "Creating micro-payload for next attempt"
-                          
-                          # For 504 Gateway Timeout, create an extremely simplified payload
-                          if [ "$HTTP_CODE" -eq 504 ]; then
-                              # Extract only the single most severe issue with minimal fields
-                              jq '{
-                                prompt: "Analyze this single SonarQube issue. Be extremely brief.",
-                                issues: [(.issues | sort_by(.severity) | reverse | .[0] | {
-                                  rule, 
-                                  severity,
-                                  component: (.component | split(":") | last),
-                                  message: (.message | if length > 50 then (.message[0:50] + "...") else . end)
-                                })]
-                              }' "$CHUNK_FILE" > "${CHUNKS_DIR}/micro-payload-${CHUNK_INDEX}.json"
-                          else
-                              # For other errors, use a slightly less aggressive simplification
-                              jq '{
-                                prompt: .prompt,
-                                issues: [.issues[0] | {rule, severity, component, message: (.message | if length > 100 then (.message[0:100] + "...") else . end)}]
-                              }' "$CHUNK_FILE" > "${CHUNKS_DIR}/micro-payload-${CHUNK_INDEX}.json"
-                          fi
-                          
-                          # Replace original payload with micro version
-                          if [ -s "${CHUNKS_DIR}/micro-payload-${CHUNK_INDEX}.json" ]; then
-                              cp "${CHUNKS_DIR}/micro-payload-${CHUNK_INDEX}.json" "$CHUNK_FILE"
-                              echo "Created micro-payload: from $CHUNK_SIZE_BYTES bytes to $(wc -c < "$CHUNK_FILE") bytes"
-                              
-                              # For 504 errors, also reduce the timeout further
-                              if [ "$HTTP_CODE" -eq 504 ]; then
-                                  TIMEOUT=30
-                                  echo "Reduced timeout to $TIMEOUT seconds for 504 error"
-                              fi
-                          fi
+                      echo "Failed to process chunk ${CHUNK_INDEX}: HTTP code ${HTTP_CODE} (Attempt ${try}/${MAX_RETRIES})"
+                      # Debug error info
+                      if [ -s "$ERROR_LOG_FILE" ]; then
+                          echo "Error log:"
+                          cat "$ERROR_LOG_FILE"
                       fi
-                  fi
-                  
-                  # Last retry failed
-                  if [ $try -eq $MAX_RETRIES ]; then
-                      echo "# GPT-4 Analysis Failed: Chunk ${CHUNK_INDEX}" > "$SUMMARY_FILE"
-                      echo "" >> "$SUMMARY_FILE"
-                      echo "Failed to process chunk ${CHUNK_INDEX} after ${MAX_RETRIES} attempts." >> "$SUMMARY_FILE"
-                      echo "" >> "$SUMMARY_FILE"
-                      echo "### Error Details" >> "$SUMMARY_FILE"
-                      echo "" >> "$SUMMARY_FILE"
-                      echo "* HTTP Status Code: ${HTTP_CODE}" >> "$SUMMARY_FILE"
-                      echo "* Chunk Size: $(wc -c < "$CHUNK_FILE") bytes" >> "$SUMMARY_FILE"
-                      echo "" >> "$SUMMARY_FILE"
-                      echo '```' >> "$SUMMARY_FILE"
-                      cat "${ERROR_LOG_FILE}" >> "$SUMMARY_FILE"
-                      
-                      # Include error response content if available
-                      if [ -s "${RESULTS_DIR}/error-body-${CHUNK_INDEX}-attempt-${try}.txt" ]; then
-                          echo "" >> "$SUMMARY_FILE"
-                          echo "#### Error Response Body:" >> "$SUMMARY_FILE"
-                          echo '```' >> "$SUMMARY_FILE"
-                          cat "${RESULTS_DIR}/error-body-${CHUNK_INDEX}-attempt-${try}.txt" >> "$SUMMARY_FILE"
+                      # If we got a response body, log it too
+                      if [ -s "$RESPONSE_LOG_FILE" ]; then
+                          echo "Response body:"
+                          cat "$RESPONSE_LOG_FILE"
                       fi
-                      
-                      echo '```' >> "$SUMMARY_FILE"
-                      return 1
-                  fi
                   fi
               done
+              
+              # All retries failed
+              echo "# GPT-4 Analysis Failed: Chunk ${CHUNK_INDEX}" > "$SUMMARY_FILE"
+              echo "" >> "$SUMMARY_FILE"
+              echo "Failed to process chunk ${CHUNK_INDEX} after ${MAX_RETRIES} attempts." >> "$SUMMARY_FILE"
+              echo "" >> "$SUMMARY_FILE"
+              echo "### Error Details" >> "$SUMMARY_FILE"
+              echo "" >> "$SUMMARY_FILE"
+              echo '```' >> "$SUMMARY_FILE"
+              cat "$ERROR_LOG_FILE" >> "$SUMMARY_FILE"
+              echo '```' >> "$SUMMARY_FILE"
+              return 1
           }
           
-          # Ultra-minimal function to process a single SonarQube issue
-          # Only used as a last resort when normal processing fails with 504 errors
-          process_single_issue() {
-              ISSUE_INDEX=$1
-              ISSUE_FILE="${CHUNKS_DIR}/single-issue-${ISSUE_INDEX}.json"
-              OUTPUT_FILE="${RESULTS_DIR}/single-issue-result-${ISSUE_INDEX}.txt"
-              SUMMARY_FILE="${RESULTS_DIR}/single-issue-summary-${ISSUE_INDEX}.md"
-              
-              echo "Processing single issue ${ISSUE_INDEX} (emergency mode)"
-              
-              # Extract a single issue
-              jq ".[$ISSUE_INDEX:$(( ISSUE_INDEX + 1 ))]" all-issues.json > "$ISSUE_FILE"
-              
-              # Create the most minimal payload possible
-              MINI_PAYLOAD="${CHUNKS_DIR}/mini-payload-${ISSUE_INDEX}.json"
-              jq -n \
-                --slurpfile issue "$ISSUE_FILE" \
-                '{
-                  "prompt": "Describe this SonarQube issue in one sentence with severity, rule, and fix.",
-                  "issue": $issue[0]
-                }' > "$MINI_PAYLOAD"
-              
-              # Use ultra-short timeout
-              MINI_TIMEOUT=20
-              
-              # Make API call with minimal payload
-              HTTP_CODE=$(curl -s -o "$OUTPUT_FILE" -w "%{http_code}" \
-                  -X POST "${GPT_FUNCTION_ENDPOINT}" \
-                  -H "Content-Type: application/json" \
-                  -H "Accept: application/json" \
-                  -H "X-Function-Timeout-Override: 15" \
-                  --connect-timeout 10 \
-                  --data-binary @"$MINI_PAYLOAD" \
-                  --max-time $MINI_TIMEOUT)
-              
-              if [ "$HTTP_CODE" -eq 200 ]; then
-                  # Extract content
-                  jq -r '.content // .result // .response // .' "$OUTPUT_FILE" > "$SUMMARY_FILE" 2>/dev/null || true
-                  
-                  # If extraction failed, use raw output
-                  if [ ! -s "$SUMMARY_FILE" ]; then
-                      echo "Issue $(( ISSUE_INDEX + 1 )): $(jq -r '.[0].rule + " - " + .[0].severity' "$ISSUE_FILE")" > "$SUMMARY_FILE"
-                      cat "$OUTPUT_FILE" >> "$SUMMARY_FILE"
-                  fi
-                  
-                  return 0
-              else
-                  # Create a basic summary directly from the issue JSON
-                  echo "## Issue $(( ISSUE_INDEX + 1 ))" > "$SUMMARY_FILE"
-                  echo "" >> "$SUMMARY_FILE"
-                  echo "* **Rule**: $(jq -r '.[0].rule' "$ISSUE_FILE")" >> "$SUMMARY_FILE"
-                  echo "* **Severity**: $(jq -r '.[0].severity' "$ISSUE_FILE")" >> "$SUMMARY_FILE"
-                  echo "* **Component**: $(jq -r '.[0].component' "$ISSUE_FILE")" >> "$SUMMARY_FILE"
-                  echo "* **Message**: $(jq -r '.[0].message' "$ISSUE_FILE")" >> "$SUMMARY_FILE"
-                  
-                  return 1
-              fi
-          }
-          
-          # Process all chunks sequentially with improved fallback strategy
+          # Process all chunks
           FAILED_CHUNKS=0
-          SUCCESS_CHUNKS=0
-          MAX_CONSECUTIVE_FAILURES=3
-          CONSECUTIVE_FAILURES=0
+          SUCCESSFUL_CHUNKS=0
           
-          # Process initial chunks
-          for (( i=0; i<$CHUNKS && i<10; i++ ))
+          echo "Processing ${CHUNKS} chunks..."
+          
+          # Process chunks in sequence to prevent overwhelming the API
+          for (( i=0; i<$CHUNKS; i++ ))
           do
-              # Add delay between chunks to avoid rate limiting
-              if [ $i -gt 0 ]; then
-                  echo "Waiting 8 seconds before processing next chunk..."
-                  sleep 8
-              fi
-              
-              # Process the chunk
               if process_chunk $i; then
-                  SUCCESS_CHUNKS=$((SUCCESS_CHUNKS + 1))
-                  CONSECUTIVE_FAILURES=0
+                  SUCCESSFUL_CHUNKS=$((SUCCESSFUL_CHUNKS + 1))
+                  echo "Chunk $i completed successfully ($SUCCESSFUL_CHUNKS/$CHUNKS completed)"
               else
                   FAILED_CHUNKS=$((FAILED_CHUNKS + 1))
-                  CONSECUTIVE_FAILURES=$((CONSECUTIVE_FAILURES + 1))
-              fi
-              
-              # If we have too many consecutive failures, try emergency smaller chunking
-              if [ $CONSECUTIVE_FAILURES -ge $MAX_CONSECUTIVE_FAILURES ]; then
-                  echo "WARNING: $CONSECUTIVE_FAILURES consecutive failures detected. Switching to emergency mode."
-                  break
+                  echo "Chunk $i failed ($FAILED_CHUNKS/$CHUNKS failed)"
               fi
           done
           
-          # If initial chunks all failed, try a different approach with super-small chunks
-          if [ $SUCCESS_CHUNKS -eq 0 ] && [ $FAILED_CHUNKS -gt 0 ]; then
-              echo "EMERGENCY MODE: All initial chunks failed. Trying ultra-minimal approach..."
-              
-              # First try with single-issue chunking for a few high-priority issues
-              echo "PHASE 1: Processing most severe issues individually..."
-              
-              # Extract 5-10 most critical issues based on severity
-              jq 'sort_by(.severity) | reverse | .[0:10]' all-issues.json > "${CHUNKS_DIR}/top-issues.json"
-              TOP_ISSUES_COUNT=$(jq 'length' "${CHUNKS_DIR}/top-issues.json")
-              
-              # Process each critical issue individually
-              for (( j=0; j<$TOP_ISSUES_COUNT; j++ ))
-              do
-                  # Extract to separate file
-                  jq ".[$j:$(( j + 1 ))]" "${CHUNKS_DIR}/top-issues.json" > "${CHUNKS_DIR}/critical-issue-${j}.json"
-                  
-                  # Create ultra-minimal payload
-                  jq -n \
-                    --slurpfile issue "${CHUNKS_DIR}/critical-issue-${j}.json" \
-                    '{
-                      "prompt": "Analyze this SonarQube issue in one sentence only.",
-                      "issue": $issue[0]
-                    }' > "${CHUNKS_DIR}/critical-payload-${j}.json"
-                  
-                  # Use the single issue processor
-                  if process_single_issue $j; then
-                      SUCCESS_CHUNKS=$((SUCCESS_CHUNKS + 1))
-                  else
-                      # If even this fails, use direct extraction approach
-                      echo "## Issue $j: $(jq -r '.[0].rule' "${CHUNKS_DIR}/critical-issue-${j}.json")" > "${RESULTS_DIR}/single-issue-summary-${j}.md"
-                      echo "* Severity: $(jq -r '.[0].severity' "${CHUNKS_DIR}/critical-issue-${j}.json")" >> "${RESULTS_DIR}/single-issue-summary-${j}.md"
-                      echo "* File: $(jq -r '.[0].component' "${CHUNKS_DIR}/critical-issue-${j}.json")" >> "${RESULTS_DIR}/single-issue-summary-${j}.md"
-                      echo "* Message: $(jq -r '.[0].message' "${CHUNKS_DIR}/critical-issue-${j}.json")" >> "${RESULTS_DIR}/single-issue-summary-${j}.md"
-                      SUCCESS_CHUNKS=$((SUCCESS_CHUNKS + 1))
-                  fi
-                  
-                  # Add longer delay between emergency attempts
-                  sleep 15
-              done
-          fi
-          
-          # Process remaining chunks if we had some success
-          if [ $SUCCESS_CHUNKS -gt 0 ]; then
-              echo "Some chunks succeeded, continuing with remaining chunks using increased delays"
-              for (( i=10; i<$CHUNKS; i++ ))
-              do
-                  echo "Waiting 15 seconds before processing chunk $i..."
-                  sleep 15
-                  
-                  # Process the chunk with normal approach
-                  if process_chunk $i; then
-                      SUCCESS_CHUNKS=$((SUCCESS_CHUNKS + 1))
-                  else
-                      FAILED_CHUNKS=$((FAILED_CHUNKS + 1))
-                  fi
-              done
-          fi
-          
-          echo "Chunk processing complete: $SUCCESS_CHUNKS successful, $FAILED_CHUNKS failed"
+          echo "Chunk processing complete: $SUCCESSFUL_CHUNKS successful, $FAILED_CHUNKS failed"
+          echo "SUCCESSFUL_CHUNKS=${SUCCESSFUL_CHUNKS}" >> $GITHUB_ENV
+          echo "FAILED_CHUNKS=${FAILED_CHUNKS}" >> $GITHUB_ENV
 
       - name: Aggregate chunk results into final report
         env:
-          GPT_FUNCTION_ENDPOINT: ${{ secrets.GPT_FUNCTION_ENDPOINT }}
-          AZURE_BLOB_SAS_URL: ${{ secrets.AZURE_BLOB_SAS_URL }}
+          GPT_FUNCTION_ENDPOINT: ${{ secrets.AZURE_FUNCTION_URL }}
         run: |
           echo "Aggregating chunk results into final report"
           TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          COMBINED_SUMMARY="${RESULTS_DIR}/gpt-final-summary-${TIMESTAMP}.md"
           
-          # Initialize combined summary file
-          COMBINED_SUMMARY="${RESULTS_DIR}/combined-summary-${TIMESTAMP}.md"
-          
-          # Check what percentage of chunks were successfully processed
+          # Check if we have enough successful chunks
           TOTAL_SUMMARY_FILES=$(find "${RESULTS_DIR}" -name "gpt-summary-*.md" | wc -l)
-          SUCCESS_PERCENT=$((TOTAL_SUMMARY_FILES * 100 / CHUNKS))
-          
-          # Continue even with a low success rate, but add warnings to the report
-          echo "Processing success rate: ${SUCCESS_PERCENT}% (${TOTAL_SUMMARY_FILES}/${CHUNKS} chunks)"
-          
-          if [ $TOTAL_SUMMARY_FILES -eq 0 ]; then
-              echo "ERROR: No chunks were successfully processed, cannot generate report"
-              echo "# GPT-4 Security Analysis - Failed" > "$COMBINED_SUMMARY"
+          if [ $TOTAL_SUMMARY_FILES -lt $(($CHUNKS / 2)) ]; then
+            echo "ERROR: Too many failed chunks, cannot generate meaningful combined report"
+            echo "# GPT-4 Security Analysis - Incomplete" > "$COMBINED_SUMMARY"
+            echo "" >> "$COMBINED_SUMMARY"
+            echo "Not enough chunks were successfully processed to generate a meaningful report." >> "$COMBINED_SUMMARY"
+            echo "" >> "$COMBINED_SUMMARY"
+            echo "Successfully processed: ${SUCCESSFUL_CHUNKS}/${CHUNKS} chunks" >> "$COMBINED_SUMMARY"
+          else
+            # For small number of chunks, combine directly
+            if [ $CHUNKS -le 5 ]; then
+              echo "Combining a small number of chunks directly"
+              echo "# Combined Security Analysis Report" > "$COMBINED_SUMMARY"
               echo "" >> "$COMBINED_SUMMARY"
-              echo "No chunks were successfully processed. Please review the logs for details." >> "$COMBINED_SUMMARY"
-              echo "" >> "$COMBINED_SUMMARY"
-              echo "Total chunks attempted: ${CHUNKS}" >> "$COMBINED_SUMMARY"
-              # Continue execution but mark report as incomplete
-              cp "$COMBINED_SUMMARY" "gpt-summary.md"
-              # Don't exit with error to allow pipeline to complete
-          elif [ $SUCCESS_PERCENT -lt 10 ]; then
-              echo "WARNING: Very few chunks processed successfully (${SUCCESS_PERCENT}%), report will be limited"
-              echo "# GPT-4 Security Analysis - Partial Results (Limited)" > "$COMBINED_SUMMARY"
-              echo "" >> "$COMBINED_SUMMARY"
-              echo "⚠️ **WARNING: Only ${SUCCESS_PERCENT}% of chunks were successfully processed.**" >> "$COMBINED_SUMMARY"
-              echo "" >> "$COMBINED_SUMMARY"
-              echo "This report contains limited analysis based on ${TOTAL_SUMMARY_FILES}/${CHUNKS} processed chunks." >> "$COMBINED_SUMMARY"
-              echo "" >> "$COMBINED_SUMMARY"
-          fi
-          
-          # Always start by collecting successful summaries for either direct combination or GPT synthesis
-          SUCCESSFUL_SUMMARIES=""
-          SUCCESSFUL_COUNT=0
-          
-          # Collect all successful summaries
-          for (( i=0; i<$CHUNKS; i++ ))
-          do
-              CHUNK_SUMMARY="${RESULTS_DIR}/gpt-summary-${i}.md"
-              if [ -f "$CHUNK_SUMMARY" ] && [ -s "$CHUNK_SUMMARY" ]; then
-                  SUCCESSFUL_SUMMARIES="${SUCCESSFUL_SUMMARIES} ${CHUNK_SUMMARY}"
-                  SUCCESSFUL_COUNT=$((SUCCESSFUL_COUNT + 1))
-              fi
-          done
-          
-          # Also check for emergency chunks
-          for (( j=0; j<3; j++ ))
-          do
-              EMERGENCY_SUMMARY="${RESULTS_DIR}/gpt-summary-emergency-${j}.md"
-              if [ -f "$EMERGENCY_SUMMARY" ] && [ -s "$EMERGENCY_SUMMARY" ]; then
-                  SUCCESSFUL_SUMMARIES="${SUCCESSFUL_SUMMARIES} ${EMERGENCY_SUMMARY}"
-                  SUCCESSFUL_COUNT=$((SUCCESSFUL_COUNT + 1))
-              fi
-          done
-          
-          echo "Found $SUCCESSFUL_COUNT successful summaries"
-          
-          # Approach 1: Combine chunks directly (for few chunks or low success rate)
-          if [ $CHUNKS -le 3 ] || [ $SUCCESSFUL_COUNT -lt 3 ]; then
-              echo "Using direct combination approach"
-              
-              # Add appropriate title based on results
-              if [ $SUCCESSFUL_COUNT -eq 0 ]; then
-                  echo "# Security Analysis Report - No Results" > "$COMBINED_SUMMARY"
-                  echo "" >> "$COMBINED_SUMMARY"
-                  echo "⚠️ **No chunks were successfully analyzed.** Please check the logs for details." >> "$COMBINED_SUMMARY"
-              else
-                  echo "# Security Analysis Report" > "$COMBINED_SUMMARY"
-                  echo "" >> "$COMBINED_SUMMARY"
-                  echo "This report combines analysis from ${SUCCESSFUL_COUNT} successfully processed chunks." >> "$COMBINED_SUMMARY"
-                  if [ $SUCCESSFUL_COUNT -lt $CHUNKS ]; then
-                      echo "" >> "$COMBINED_SUMMARY"
-                      echo "⚠️ **Note:** Only ${SUCCESSFUL_COUNT} out of ${CHUNKS} chunks were successfully processed." >> "$COMBINED_SUMMARY"
-                  fi
-              fi
+              echo "This report combines analysis from ${SUCCESSFUL_CHUNKS} successful chunks." >> "$COMBINED_SUMMARY"
               echo "" >> "$COMBINED_SUMMARY"
               
-              # Append each successful chunk's analysis to the combined summary
-              for SUMMARY in $SUCCESSFUL_SUMMARIES
+              # Add each chunk to the report
+              for (( i=0; i<$CHUNKS; i++ ))
               do
-                  # Extract chunk number from filename
-                  CHUNK_NAME=$(basename "$SUMMARY" .md | sed 's/gpt-summary-//')
-                  echo "## Analysis: $CHUNK_NAME" >> "$COMBINED_SUMMARY"
+                CHUNK_SUMMARY="${RESULTS_DIR}/gpt-summary-${i}.md"
+                if [ -f "$CHUNK_SUMMARY" ]; then
+                  echo "## Chunk $((i + 1)) Analysis" >> "$COMBINED_SUMMARY"
                   echo "" >> "$COMBINED_SUMMARY"
-                  cat "$SUMMARY" >> "$COMBINED_SUMMARY"
+                  cat "$CHUNK_SUMMARY" >> "$COMBINED_SUMMARY"
                   echo "" >> "$COMBINED_SUMMARY"
                   echo "---" >> "$COMBINED_SUMMARY"
                   echo "" >> "$COMBINED_SUMMARY"
+                else
+                  echo "## Chunk $((i + 1)) Analysis" >> "$COMBINED_SUMMARY"
+                  echo "" >> "$COMBINED_SUMMARY"
+                  echo "Analysis for this chunk is not available." >> "$COMBINED_SUMMARY"
+                  echo "" >> "$COMBINED_SUMMARY"
+                  echo "---" >> "$COMBINED_SUMMARY"
+                  echo "" >> "$COMBINED_SUMMARY"
+                fi
               done
-          # Approach 2: For more chunks with decent success rate, use GPT to synthesize the results
-          else
-              echo "Using GPT to synthesize results from ${CHUNKS} chunks"
+            else
+              # For larger numbers of chunks, use GPT-4 for synthesis
+              echo "Using GPT to synthesize results from ${SUCCESSFUL_CHUNKS} successful chunks"
               
-              # Prepare summaries for the final prompt with extreme compression
-              CHUNK_SUMMARIES=""
-              TOTAL_SIZE=0
-              MAX_TOTAL_SIZE=15000  # Maximum total size for all summaries combined
-              MAX_PER_CHUNK=1000    # Maximum size per chunk, severely reduced
+              # Create synthesis JSON file - write to file directly instead of using heredoc
+              echo "{" > synthesis-prompt.json
+              echo '  "prompt": "As a security expert, synthesize the following individual security analysis chunks into one cohesive report. Focus on:\n1. Top critical and major issues across all chunks\n2. Common patterns of security issues\n3. Key recommendations that address multiple issues\n\nProvide a concise executive summary followed by specific findings and actionable recommendations.",' >> synthesis-prompt.json
+              echo '  "chunkResults": [' >> synthesis-prompt.json
               
-              # Create a list of summaries sorted by file size (prioritize smaller, more concise ones)
-              find "${RESULTS_DIR}" -name "gpt-summary-*.md" -type f -not -empty | xargs ls -S | tac > "${RESULTS_DIR}/sorted-summaries.txt"
-              
-              # Read each summary file, but limit total size
-              while read SUMMARY_FILE
+              # Add each successful chunk to synthesis input
+              FIRST=true
+              for (( i=0; i<$CHUNKS; i++ ))
               do
-                  # Skip if we've reached total size limit
-                  if [ $TOTAL_SIZE -gt $MAX_TOTAL_SIZE ]; then
-                      echo "Reached maximum combined size limit ($MAX_TOTAL_SIZE bytes)"
-                      break
+                CHUNK_SUMMARY="${RESULTS_DIR}/gpt-summary-${i}.md"
+                if [ -f "$CHUNK_SUMMARY" ] && [ -s "$CHUNK_SUMMARY" ]; then
+                  if ! grep -q "Failed to process chunk" "$CHUNK_SUMMARY"; then
+                    if [ "$FIRST" = true ]; then
+                      FIRST=false
+                    else
+                      echo "," >> synthesis-prompt.json
+                    fi
+                    jq -Rs '    { "chunk": . }' "$CHUNK_SUMMARY" >> synthesis-prompt.json
                   fi
-                  
-                  # Extract chunk identifier
-                  CHUNK_ID=$(basename "$SUMMARY_FILE" .md | sed 's/gpt-summary-//')
-                  
-                  # Calculate summary size
-                  SUMMARY_SIZE=$(wc -c < "$SUMMARY_FILE")
-                  
-                  # Create ultra-compressed summary
-                  TEMP_SUMMARY="${RESULTS_DIR}/ultra-temp-${CHUNK_ID}.txt"
-                  
-                  # Extract only the absolute essentials
-                  echo "## Issues from Chunk ${CHUNK_ID}" > "$TEMP_SUMMARY"
-                  echo "" >> "$TEMP_SUMMARY"
-                  
-                  # Extract only the most critical issues with ultra-minimal context
-                  grep -m3 -i "critical\|high severity\|severe\|major" "$SUMMARY_FILE" | head -3 >> "$TEMP_SUMMARY"
-                  echo "..." >> "$TEMP_SUMMARY"
-                  
-                  # Extremely aggressive size limiting
-                  MAX_CHARS=200
-                  if [ $(wc -c < "$TEMP_SUMMARY") -gt $MAX_CHARS ]; then
-                      head -c $MAX_CHARS "$TEMP_SUMMARY" > "${TEMP_SUMMARY}.cut"
-                      echo "..." >> "${TEMP_SUMMARY}.cut"
-                      mv "${TEMP_SUMMARY}.cut" "$TEMP_SUMMARY"
-                  fi
-                  
-                  # Properly escape the content to avoid issues
-                  perl -pe 's/([\\$"`])/\\$1/g' "$TEMP_SUMMARY" > "${TEMP_SUMMARY}.esc"
-                  
-                  # Add to combined summaries
-                  CHUNK_SUMMARIES="${CHUNK_SUMMARIES}$(cat ${TEMP_SUMMARY}.esc)\n\n---\n\n"
-                  CURR_SIZE=$(wc -c < "${TEMP_SUMMARY}.esc")
-                  TOTAL_SIZE=$((TOTAL_SIZE + CURR_SIZE))
-                  
-                  echo "Added summary for chunk ${CHUNK_ID}: ${CURR_SIZE} bytes (total: ${TOTAL_SIZE}/${MAX_TOTAL_SIZE})"
-              done < "${RESULTS_DIR}/sorted-summaries.txt"
+                fi
+              done
               
-              # If we have very few successful chunks, use even more aggressive summarization
-              if [ $SUCCESSFUL_COUNT -lt 5 ]; then
-                  echo "Using emergency prompt due to low success rate"
-                  PROMPT_TEMPLATE="emergency-prompt.txt"
+              # Close the JSON structure
+              echo "  ]" >> synthesis-prompt.json
+              echo "}" >> synthesis-prompt.json
+              
+              # Validate JSON and process
+              if ! jq empty synthesis-prompt.json > /dev/null 2>&1; then
+                echo "ERROR: Generated invalid JSON synthesis prompt"
+                echo "# GPT-4 Security Analysis - Synthesis Failed" > "$COMBINED_SUMMARY"
+                echo "" >> "$COMBINED_SUMMARY"
+                echo "Failed to generate a valid synthesis prompt." >> "$COMBINED_SUMMARY"
+                echo "" >> "$COMBINED_SUMMARY"
+                echo "Individual chunk analyses are available." >> "$COMBINED_SUMMARY"
               else
-                  PROMPT_TEMPLATE="final-prompt.txt"
-              fi
-              
-              echo "Prepared ultra-compressed summaries, total size: $TOTAL_SIZE bytes"
-              
-              # Prepare the final GPT prompt for synthesizing results
-              FINAL_PROMPT_FILE="${RESULTS_DIR}/final-prompt-${TIMESTAMP}.txt"
-              # Use perl instead of sed for more reliable replacement of multi-line content
-              perl -e '
-                  local $/;
-                  open(my $template, "<", "final-prompt.txt");
-                  my $content = <$template>;
-                  close($template);
-                  my $summaries = $ENV{"CHUNK_SUMMARIES"};
-                  $content =~ s/\{CHUNK_SUMMARIES\}/$summaries/g;
-                  open(my $out, ">", "'"${FINAL_PROMPT_FILE}"'");
-                  print $out $content;
-                  close($out);
-              '
-              
-              # Create payload for final GPT call
-              jq -n \
-                --rawfile prompt "$FINAL_PROMPT_FILE" \
-                '{"prompt": $prompt}' > "${RESULTS_DIR}/final-gpt-payload-${TIMESTAMP}.json"
-              
-              echo "Calling GPT to synthesize the final report"
-              MAX_RETRIES=3
-              TIMEOUT=240  # Longer timeout for synthesis
-              
-              for try in $(seq 1 $MAX_RETRIES); do
+                # Try to synthesize with GPT-4
+                echo "Calling GPT-4 for final synthesis..."
+                MAX_RETRIES=3
+                SYNTHESIS_SUCCESS=false
+                
+                for try in $(seq 1 $MAX_RETRIES); do
                   if [ $try -gt 1 ]; then
-                      SLEEP_TIME=$(( (try - 1) * 30 ))
-                      echo "Retrying final synthesis after ${SLEEP_TIME}s delay (Attempt ${try}/${MAX_RETRIES})"
-                      sleep $SLEEP_TIME
+                    SLEEP_TIME=$(( (try - 1) * 30 ))
+                    echo "Retrying synthesis after ${SLEEP_TIME}s delay (Attempt ${try}/${MAX_RETRIES})"
+                    sleep $SLEEP_TIME
                   fi
                   
-                  # Debug log the final synthesis payload size
-                  echo "Submitting final synthesis of $(wc -c < "${RESULTS_DIR}/final-gpt-payload-${TIMESTAMP}.json") bytes to GPT API"
+                  # Call GPT-4 for synthesis
+                  HTTP_CODE=$(curl -s -o synthesis-result.md -w "%{http_code}" \
+                    -X POST "${GPT_FUNCTION_ENDPOINT}" \
+                    -H "Content-Type: application/json" \
+                    --data-binary @synthesis-prompt.json \
+                    --max-time 300)
                   
-                  # Save a copy of the final prompt for debugging
-                  cp "${FINAL_PROMPT_FILE}" "${RESULTS_DIR}/final-prompt-debug-${TIMESTAMP}.txt"
-                       # Call the GPT-4 API for final synthesis with improved request handling
-              
-              # Check payload size first and handle appropriately
-              PAYLOAD_SIZE=$(wc -c < "${RESULTS_DIR}/final-gpt-payload-${TIMESTAMP}.json")
-              echo "Final synthesis payload size: $PAYLOAD_SIZE bytes"
-              
-              if [ $PAYLOAD_SIZE -gt 800000 ]; then
-                echo "WARNING: Final payload is too large (${PAYLOAD_SIZE} bytes). Creating simplified version."
-                # Extract just the beginning and end of each chunk summary to reduce size
-                SIMPLIFIED_SUMMARY=""
-                for (( i=0; i<$CHUNKS; i++ ))
-                do
-                  CHUNK_SUMMARY="${RESULTS_DIR}/gpt-summary-${i}.md"
-                  if [ -f "$CHUNK_SUMMARY" ]; then
-                    echo "## Summary of Chunk $((i + 1))" >> "${RESULTS_DIR}/simplified-summaries.txt"
-                    # Extract first 5 lines
-                    head -n 5 "$CHUNK_SUMMARY" >> "${RESULTS_DIR}/simplified-summaries.txt"
-                    echo "..." >> "${RESULTS_DIR}/simplified-summaries.txt"
-                    # Extract middle section with key findings
-                    grep -A 5 -i "critical\|severe\|important" "$CHUNK_SUMMARY" | head -n 10 >> "${RESULTS_DIR}/simplified-summaries.txt" 2>/dev/null || true
-                    echo "..." >> "${RESULTS_DIR}/simplified-summaries.txt"
-                    # Extract conclusion section
-                    tail -n 5 "$CHUNK_SUMMARY" >> "${RESULTS_DIR}/simplified-summaries.txt"
-                    echo -e "\n---\n" >> "${RESULTS_DIR}/simplified-summaries.txt"
+                  if [ "$HTTP_CODE" -eq 200 ] && [ -s synthesis-result.md ]; then
+                    echo "Synthesis successful!"
+                    SYNTHESIS_SUCCESS=true
+                    break
+                  else
+                    echo "Synthesis attempt ${try} failed: HTTP code ${HTTP_CODE}"
                   fi
                 done
                 
-                # Create a new payload with the simplified summaries
-                perl -e '
-                    local $/;
-                    open(my $template, "<", "final-prompt.txt");
-                    my $content = <$template>;
-                    close($template);
-                    open(my $summaries, "<", "'"${RESULTS_DIR}/simplified-summaries.txt"'");
-                    my $simplified = <$summaries>;
-                    close($summaries);
-                    $content =~ s/\{CHUNK_SUMMARIES\}/$simplified/g;
-                    open(my $out, ">", "'"${RESULTS_DIR}/simplified-final-prompt-${TIMESTAMP}.txt"'");
-                    print $out $content;
-                    close($out);
-                '
-                
-                # Create a new payload file with the simplified prompt
-                jq -n \
-                  --rawfile prompt "${RESULTS_DIR}/simplified-final-prompt-${TIMESTAMP}.txt" \
-                  '{"prompt": $prompt}' > "${RESULTS_DIR}/simplified-final-payload-${TIMESTAMP}.json"
-                
-                # Use the simplified payload instead
-                cp "${RESULTS_DIR}/simplified-final-payload-${TIMESTAMP}.json" "${RESULTS_DIR}/final-gpt-payload-${TIMESTAMP}.json"
-                echo "Simplified payload size: $(wc -c < "${RESULTS_DIR}/final-gpt-payload-${TIMESTAMP}.json") bytes"
+                # Create final report based on synthesis result
+                if [ "$SYNTHESIS_SUCCESS" = true ]; then
+                  echo "# GPT-4 Security Analysis - Synthesized Report" > "$COMBINED_SUMMARY"
+                  echo "" >> "$COMBINED_SUMMARY"
+                  echo "This report synthesizes findings from ${SUCCESSFUL_CHUNKS}/${CHUNKS} successful chunks." >> "$COMBINED_SUMMARY"
+                  echo "" >> "$COMBINED_SUMMARY"
+                  cat synthesis-result.md >> "$COMBINED_SUMMARY"
+                else
+                  # Manual aggregation fallback
+                  echo "# GPT-4 Security Analysis - Manual Aggregation" > "$COMBINED_SUMMARY"
+                  echo "" >> "$COMBINED_SUMMARY"
+                  echo "GPT synthesis failed. This report combines individual chunk analyses without synthesis." >> "$COMBINED_SUMMARY"
+                  echo "" >> "$COMBINED_SUMMARY"
+                  
+                  for (( i=0; i<$CHUNKS; i++ ))
+                  do
+                    CHUNK_SUMMARY="${RESULTS_DIR}/gpt-summary-${i}.md"
+                    if [ -f "$CHUNK_SUMMARY" ]; then
+                      echo "## Chunk $((i + 1)) Analysis" >> "$COMBINED_SUMMARY"
+                      echo "" >> "$COMBINED_SUMMARY"
+                      cat "$CHUNK_SUMMARY" >> "$COMBINED_SUMMARY"
+                      echo "" >> "$COMBINED_SUMMARY"
+                      echo "---" >> "$COMBINED_SUMMARY"
+                      echo "" >> "$COMBINED_SUMMARY"
+                    fi
+                  done
+                fi
               fi
-              
-              # Call the API with enhanced timeout handling for final synthesis
-              HTTP_CODE=$(curl -v -i -s -o "${RESULTS_DIR}/final-response-${TIMESTAMP}.txt" -w "%{http_code}" \
-                  -X POST "${GPT_FUNCTION_ENDPOINT}" \
-                  -H "Content-Type: application/json" \
-                  -H "Accept: application/json" \
-                  -H "User-Agent: SonarGPT-Pipeline/1.0" \
-                  -H "X-Function-Timeout-Override: 30" \
-                  --connect-timeout 20 \
-                  --data-binary @"${RESULTS_DIR}/final-gpt-payload-${TIMESTAMP}.json" \
-                  --max-time 90 2> "${RESULTS_DIR}/final-curl-error-${TIMESTAMP}.txt")
-              
-              # Check for timeout conditions
-              if grep -q "Operation timed out" "${RESULTS_DIR}/final-curl-error-${TIMESTAMP}.txt" || \
-                 grep -q "Connection timed out" "${RESULTS_DIR}/final-curl-error-${TIMESTAMP}.txt" || \
-                 [ "$HTTP_CODE" -eq 504 ] || [ "$HTTP_CODE" -eq 0 ]; then
-                  echo "TIMEOUT DETECTED: Final synthesis timed out or returned 504"
-                  # Force handling as a 504 error
-                  HTTP_CODE=504
-              fi
-                       if [ "$HTTP_CODE" -eq 200 ]; then
-                  echo "Final synthesis completed successfully"
-                  
-                  # Save raw response for debugging
-                  cp "${RESULTS_DIR}/final-response-${TIMESTAMP}.txt" "${RESULTS_DIR}/final-raw-response-${TIMESTAMP}.json"
-                  
-                  # Extract HTTP body (skip headers) for cleaner processing
-                  # Look for blank line that separates HTTP headers from body
-                  awk 'BEGIN {body=0} /^\r?$/ {body=1; next} {if (body) print $0}' "${RESULTS_DIR}/final-response-${TIMESTAMP}.txt" > "${RESULTS_DIR}/final-response-body-${TIMESTAMP}.txt"
-                  
-                  # Process response with enhanced parsing logic
-                  if grep -q "^#" "${RESULTS_DIR}/final-response-body-${TIMESTAMP}.txt"; then
-                      echo "Found markdown response"
-                      # Direct markdown response
-                      cat "${RESULTS_DIR}/final-response-body-${TIMESTAMP}.txt" > "$COMBINED_SUMMARY"
-                  elif grep -q "^{" "${RESULTS_DIR}/final-response-body-${TIMESTAMP}.txt"; then
-                      echo "Found JSON response"
-                      # Log JSON structure for debugging
-                      jq 'keys' "${RESULTS_DIR}/final-response-body-${TIMESTAMP}.txt" > "${RESULTS_DIR}/final-keys-${TIMESTAMP}.txt" 2>/dev/null || echo "Failed to extract JSON keys"
-                      
-                      # Save JSON structure for debugging
-                      cp "${RESULTS_DIR}/final-response-body-${TIMESTAMP}.txt" "${RESULTS_DIR}/final-json-debug-${TIMESTAMP}.json"
-                      
-                      # Try multiple field extraction patterns with comprehensive error handling
-                      if jq -r '.content // .result // .markdown // .text // .analysis // .output // .response // .message.content // .choices[0].message.content // .choices[0].text // .answer // .' "${RESULTS_DIR}/final-response-body-${TIMESTAMP}.txt" > "$COMBINED_SUMMARY" 2>/dev/null; then
-                          echo "Extracted content from JSON response for final synthesis"
-                          
-                          # Verify the summary file has meaningful content
-                          if [ ! -s "$COMBINED_SUMMARY" ]; then
-                              echo "Warning: Extracted content is empty, trying alternative extraction"
-                              # Try an alternative extraction approach
-                              if grep -q '"content"' "${RESULTS_DIR}/final-response-body-${TIMESTAMP}.txt"; then
-                                  # Extract content field with grep/sed as a fallback
-                                  grep -o '"content":"[^"]*"' "${RESULTS_DIR}/final-response-body-${TIMESTAMP}.txt" | sed 's/"content":"//;s/"$//' > "$COMBINED_SUMMARY"
-                              else
-                                  # Fall back to raw response
-                                  echo "# GPT-4 Combined Security Analysis" > "$COMBINED_SUMMARY"
-                                  cat "${RESULTS_DIR}/final-response-body-${TIMESTAMP}.txt" >> "$COMBINED_SUMMARY"
-                              fi
-                          fi
-                      else
-                          # Fall back to raw response
-                          echo "JSON extraction failed - using raw output"
-                          echo "# GPT-4 Combined Security Analysis" > "$COMBINED_SUMMARY"
-                          cat "${RESULTS_DIR}/final-response-body-${TIMESTAMP}.txt" >> "$COMBINED_SUMMARY"
-                      fi
-                  else
-                      echo "Found plain text response"
-                      # Raw text response
-                      echo "# GPT-4 Combined Security Analysis" > "$COMBINED_SUMMARY"
-                      cat "${RESULTS_DIR}/final-response-body-${TIMESTAMP}.txt" >> "$COMBINED_SUMMARY"
-                  fi
-                  
-                  # Verify final report has content
-                  if [ ! -s "$COMBINED_SUMMARY" ] || [ $(wc -c < "$COMBINED_SUMMARY") -lt 100 ]; then
-                      echo "WARNING: Final report is too small or empty. Using fallback approach."
-                      echo "# GPT-4 Combined Security Analysis - Fallback Report" > "$COMBINED_SUMMARY"
-                      echo "" >> "$COMBINED_SUMMARY"
-                      echo "## Summary of Findings" >> "$COMBINED_SUMMARY"
-                      echo "" >> "$COMBINED_SUMMARY"
-                      echo "The automated analysis encountered issues combining the individual chunk analyses." >> "$COMBINED_SUMMARY"
-                      echo "Please refer to the individual chunk analyses for details on security issues." >> "$COMBINED_SUMMARY"
-                      echo "" >> "$COMBINED_SUMMARY"
-                      
-                      # Add top-level issues from each chunk
-                      for (( i=0; i<$CHUNKS; i++ ))
-                      do
-                          CHUNK_SUMMARY="${RESULTS_DIR}/gpt-summary-${i}.md"
-                          if [ -f "$CHUNK_SUMMARY" ] && [ -s "$CHUNK_SUMMARY" ]; then
-                              echo "### Key Issues from Chunk $((i + 1))" >> "$COMBINED_SUMMARY"
-                              echo "" >> "$COMBINED_SUMMARY"
-                              # Extract first heading section only
-                              awk '/^#/ {if (p) exit; print; p=1} p' "$CHUNK_SUMMARY" >> "$COMBINED_SUMMARY" 2>/dev/null || true
-                              echo "" >> "$COMBINED_SUMMARY"
-                          fi
-                      done
-                  fi
-                      
-                      break
-                  else
-                      echo "API request failed for final synthesis with HTTP code ${HTTP_CODE} (attempt ${try})"
-                      echo "Error details:"
-                      cat "${RESULTS_DIR}/final-curl-error-${TIMESTAMP}.txt"
-                      
-                      # Last retry failed, create manual combination
-                      if [ $try -eq $MAX_RETRIES ]; then
-                          echo "# Combined Security Analysis Report (Manual Aggregation)" > "$COMBINED_SUMMARY"
-                          echo "" >> "$COMBINED_SUMMARY"
-                          echo "GPT synthesis failed. This report combines individual chunk analyses without synthesis." >> "$COMBINED_SUMMARY"
-                          echo "" >> "$COMBINED_SUMMARY"
-                          
-                          # Append each chunk's analysis to the combined summary
-                          for (( i=0; i<$CHUNKS; i++ ))
-                          do
-                              CHUNK_SUMMARY="${RESULTS_DIR}/gpt-summary-${i}.md"
-                              if [ -f "$CHUNK_SUMMARY" ]; then
-                                  echo "## Chunk $((i + 1)) Analysis" >> "$COMBINED_SUMMARY"
-                                  echo "" >> "$COMBINED_SUMMARY"
-                                  cat "$CHUNK_SUMMARY" >> "$COMBINED_SUMMARY"
-                                  echo "" >> "$COMBINED_SUMMARY"
-                                  echo "---" >> "$COMBINED_SUMMARY"
-                                  echo "" >> "$COMBINED_SUMMARY"
-                              fi
-                          done
-                      fi
-                  fi
-              done
+            fi
           fi
           
-          # Create a comprehensive metadata file with detailed diagnostic information
-          METADATA_FILE="${RESULTS_DIR}/pipeline-metadata-${TIMESTAMP}.json"
-          
-          # Calculate average chunk size for diagnostics
-          AVG_CHUNK_SIZE=0
-          if [ -d "${CHUNKS_DIR}" ] && [ "$(ls -A ${CHUNKS_DIR}/gpt-payload-*.json 2>/dev/null)" ]; then
-              TOTAL_SIZE=$(find "${CHUNKS_DIR}" -name "gpt-payload-*.json" -exec wc -c {} \; | awk '{sum+=$1} END {print sum}')
-              FILE_COUNT=$(find "${CHUNKS_DIR}" -name "gpt-payload-*.json" | wc -l)
-              if [ "$FILE_COUNT" -gt 0 ]; then
-                  AVG_CHUNK_SIZE=$((TOTAL_SIZE / FILE_COUNT))
-              fi
-          fi
-          
-          # Get response sizes
-          RESPONSE_SIZE_TOTAL=0
-          RESPONSE_COUNT=0
-          for file in "${RESULTS_DIR}"/gpt-result-*.txt; do
-              if [ -f "$file" ]; then
-                  RESPONSE_SIZE_TOTAL=$((RESPONSE_SIZE_TOTAL + $(wc -c < "$file")))
-                  RESPONSE_COUNT=$((RESPONSE_COUNT + 1))
-              fi
-          done
-          
-          AVG_RESPONSE_SIZE=0
-          if [ "$RESPONSE_COUNT" -gt 0 ]; then
-              AVG_RESPONSE_SIZE=$((RESPONSE_SIZE_TOTAL / RESPONSE_COUNT))
-          fi
-          
-          # Create extended metadata
-          jq -n \
-            --arg timestamp "$(date)" \
-            --arg chunkSize "$CHUNK_SIZE" \
-            --arg totalIssues "$TOTAL_ISSUES" \
-            --arg chunks "$CHUNKS" \
-            --arg successChunks "$SUCCESS_CHUNKS" \
-            --arg failedChunks "$FAILED_CHUNKS" \
-            --arg avgChunkSize "$AVG_CHUNK_SIZE" \
-            --arg avgResponseSize "$AVG_RESPONSE_SIZE" \
-            --arg finalPayloadSize "$(wc -c < "${RESULTS_DIR}/final-gpt-payload-${TIMESTAMP}.json" 2>/dev/null || echo 0)" \
-            --arg finalResponseSize "$(wc -c < "${RESULTS_DIR}/final-response-${TIMESTAMP}.txt" 2>/dev/null || echo 0)" \
-            --arg finalSummarySize "$(wc -c < "$COMBINED_SUMMARY" 2>/dev/null || echo 0)" \
-            '{
-              "executionTimestamp": $timestamp,
-              "report": {
-                "totalIssues": $totalIssues | tonumber,
-                "chunkingStrategy": {
-                  "chunkSize": $chunkSize | tonumber,
-                  "totalChunks": $chunks | tonumber
-                },
-                "processingResults": {
-                  "successfulChunks": $successChunks | tonumber,
-                  "failedChunks": $failedChunks | tonumber,
-                  "successRate": (if ($chunks | tonumber) > 0 then (($successChunks | tonumber) / ($chunks | tonumber) * 100) else 0 end)
-                },
-                "dataSizes": {
-                  "averageChunkSizeBytes": $avgChunkSize | tonumber,
-                  "averageResponseSizeBytes": $avgResponseSize | tonumber,
-                  "finalPayloadSizeBytes": $finalPayloadSize | tonumber,
-                  "finalResponseSizeBytes": $finalResponseSize | tonumber,
-                  "finalSummarySizeBytes": $finalSummarySize | tonumber
-                },
-                "version": "1.2.0"
-              }
-            }' > "$METADATA_FILE"
-            
-          # Also create a simplified text summary for quick reading
-          echo "# SonarGPT Pipeline Execution Summary" > "${RESULTS_DIR}/execution-summary-${TIMESTAMP}.md"
-          echo "" >> "${RESULTS_DIR}/execution-summary-${TIMESTAMP}.md"
-          echo "- Execution Time: $(date)" >> "${RESULTS_DIR}/execution-summary-${TIMESTAMP}.md"
-          echo "- Total Issues: $TOTAL_ISSUES" >> "${RESULTS_DIR}/execution-summary-${TIMESTAMP}.md"
-          echo "- Chunks: $CHUNKS (size: $CHUNK_SIZE issues per chunk)" >> "${RESULTS_DIR}/execution-summary-${TIMESTAMP}.md"
-          echo "- Successful Chunks: $SUCCESS_CHUNKS" >> "${RESULTS_DIR}/execution-summary-${TIMESTAMP}.md"
-          echo "- Failed Chunks: $FAILED_CHUNKS" >> "${RESULTS_DIR}/execution-summary-${TIMESTAMP}.md"
-          echo "- Success Rate: $(( 100 * SUCCESS_CHUNKS / CHUNKS ))%" >> "${RESULTS_DIR}/execution-summary-${TIMESTAMP}.md"
-            
-          # Also save a copy in the root for easy access
-          cp "$COMBINED_SUMMARY" "gpt-summary.md"
-          echo "Final combined report saved to gpt-summary.md and $COMBINED_SUMMARY"
-          echo "Execution metadata saved to $METADATA_FILE"
+          echo "Final report generated at: $COMBINED_SUMMARY"
+          echo "FINAL_REPORT=${COMBINED_SUMMARY}" >> $GITHUB_ENV
 
-      - name: Upload Final Report to Azure Blob Storage
+      - name: Upload Final GPT-4 Report to Azure Blob
         env:
           AZURE_BLOB_SAS_URL: ${{ secrets.AZURE_BLOB_SAS_URL }}
         run: |
-          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-          FILENAME="gpt-final-summary-${TIMESTAMP}.md"
+          FILENAME=$(basename "$FINAL_REPORT")
           SAS_URL="${AZURE_BLOB_SAS_URL}"
           BASE_URL=$(echo "$SAS_URL" | cut -d'?' -f1)
           SAS_TOKEN=$(echo "$SAS_URL" | cut -d'?' -f2-)
           FULL_URL="${BASE_URL}/${FILENAME}?${SAS_TOKEN}"
-          curl -s -S -f -X PUT "$FULL_URL" -H "x-ms-blob-type: BlockBlob" --data-binary @gpt-summary.md
           
-          echo "Final analysis summary has been successfully uploaded to Azure Blob Storage as $FILENAME"
+          echo "Uploading final GPT-4 security analysis report..."
+          curl -s -S -f -X PUT "$FULL_URL" -H "x-ms-blob-type: BlockBlob" --data-binary @"$FINAL_REPORT"
+          echo "Uploaded final report to Azure Blob: $FILENAME"
