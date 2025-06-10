@@ -112,3 +112,12 @@ jobs:
           FOLDER_DATE=$(date +%Y%m%d)
           cp sonar-report-pretty.json "report/${FOLDER_DATE}/${FILENAME}"
           echo "SonarQube report saved to report/${FOLDER_DATE}/${FILENAME}"
+ 
+      - name: Trigger Azure Function for GPT-4 Summary
+        run: |
+          curl -X POST "$AZURE_FUNCTION_URL" \
+          -H "Content-Type: application/json" \
+          -d '{
+                "blob_url": "'"$SAS_BLOB_URL"'",
+                "prompt_mode": "sonarqube_summary"
+              }'         
