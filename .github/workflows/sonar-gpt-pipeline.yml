@@ -112,4 +112,3 @@ jobs:
           FOLDER_DATE=$(date +%Y%m%d)
           cp sonar-report-pretty.json "report/${FOLDER_DATE}/${FILENAME}"
           echo "SonarQube report saved to report/${FOLDER_DATE}/${FILENAME}"
-
