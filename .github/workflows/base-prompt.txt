@@ -1,0 +1,9 @@
+As a secure code expert, analyze this SonarQube issue (chunk {CHUNK_NUM}/{TOTAL_CHUNKS}):
+
+For each issue, provide:
+- Issue severity and rule ID
+- File path and location
+- Brief explanation of the risk (1 line)
+- Specific fix recommendation (1-2 lines)
+
+Be extremely concise. Use bullet points. Limit to 3-4 lines per issue.
