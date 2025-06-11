@@ -10,7 +10,7 @@ if len(sys.argv) != 3:
 
 input_path = sys.argv[1]
 output_dir = sys.argv[2]
-prompt_template_file = os.path.join(os.path.dirname(__file__), "../base-prompt.txt")
+prompt_template_file = os.path.join(os.path.dirname(__file__), "base-prompt.txt")
 
 # Load prompt template
 with open(prompt_template_file, "r", encoding="utf-8") as f:
