@@ -1,11 +1,16 @@
+from pathlib import Path
+
+# Generate the patched content for split_sonar_report.py
+patched_code = '''\
 import json
 import os
 import math
 
-# Constants
-INPUT_FILE = "sonar-report-pretty.json"
-OUTPUT_DIR = "chunked-reports"
-PROMPT_TEMPLATE_FILE = "base-prompt.txt"
+# Dynamic paths based on script location
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+PROMPT_TEMPLATE_FILE = os.path.join(BASE_DIR, "../../base-prompt.txt")
+INPUT_FILE = os.path.join(BASE_DIR, "../../report/20250611/sonar-report-20250611-072220.json")
+OUTPUT_DIR = os.path.join(BASE_DIR, "../../chunked-reports")
 CHUNK_SIZE = 10  # Number of issues per chunk
 
 # Load prompt template
@@ -29,8 +34,15 @@ for i in range(total_chunks):
         "prompt": prompt,
         "issues": chunk
     }
-    filename = f"{OUTPUT_DIR}/chunk_{i+1:03}.json"
+    filename = os.path.join(OUTPUT_DIR, f"chunk_{i+1:03}.json")
     with open(filename, "w", encoding="utf-8") as f:
         json.dump(chunk_input, f, indent=2, ensure_ascii=False)
 
 print(f"✅ Split {len(issues)} issues into {total_chunks} chunks in '{OUTPUT_DIR}/'")
+'''
+
+# Save to file for user download
+output_path = "/mnt/data/split_sonar_report.py"
+Path(output_path).write_text(patched_code, encoding="utf-8")
+
+
