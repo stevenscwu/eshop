@@ -123,14 +123,15 @@ jobs:
       - name: GPT-4 AI Analysis
         run: |
           for chunk in chunked-reports/*.json; do
-            jq -r '.prompt' "$chunk" > prompt.txt
-            jq -c '.issues' "$chunk" > issues.json
+            # Combine prompt and issues (already formatted by Python script)
+            jq -c '.' "$chunk" > input.json
 
+            # Send to Azure Function
             curl -X POST "$AZURE_FUNCTION_URL" \
               -H "Content-Type: application/json" \
-              --data-urlencode "prompt=$(cat prompt.txt)" \
-              --data-binary @issues.json >> gpt4-summary.md
+              --data-binary @input.json >> gpt4-summary.md
           done
+
 
       - name: Upload GPT-4 summary to Azure Blob Storage
         run: |
