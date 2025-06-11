@@ -1,6 +1,5 @@
 # Security Analysis Pipeline with SonarQube + GPT-4 + Azure Blob Upload
-# Enhanced with report chunking to handle large SonarQube reports exceeding GPT-4 token limits
-name: Fullstack Security Analysis with SonarQube + GPT-4 (Chunked)
+name: Fullstack Security Analysis with SonarQube
 
 on:
   workflow_dispatch:
@@ -56,13 +55,6 @@ jobs:
       - name: Wait for SonarQube to finalize
         run: sleep 60
 
-      - name: Create report directory structure
-        run: |
-          TIMESTAMP=$(date +%Y%m%d)
-          mkdir -p report/$TIMESTAMP/gpt-summaries
-          mkdir -p report/$TIMESTAMP/chunks
-          mkdir -p report/$TIMESTAMP/results
-
       - name: Download SonarQube Issues
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -112,12 +104,31 @@ jobs:
           FOLDER_DATE=$(date +%Y%m%d)
           cp sonar-report-pretty.json "report/${FOLDER_DATE}/${FILENAME}"
           echo "SonarQube report saved to report/${FOLDER_DATE}/${FILENAME}"
- 
-      - name: Trigger Azure Function for GPT-4 Summary
+      
+      - name: Chunk SonarQube report for GPT-4
         run: |
-          curl -X POST "$AZURE_FUNCTION_URL" \
-          -H "Content-Type: application/json" \
-          -d '{
-                "blob_url": "'"$SAS_BLOB_URL"'",
-                "prompt_mode": "sonarqube_summary"
-              }'         
+          python3 .github/scripts/split_sonar_report.py
+
+      - name: GPT-4 AI Analysis
+        run: |
+          for chunk in chunked-reports/*.json; do
+            jq -r '.prompt' "$chunk" > prompt.txt
+            jq -c '.issues' "$chunk" > issues.json
+
+            curl -X POST "$AZURE_FUNCTION_URL" \
+              -H "Content-Type: application/json" \
+              --data-binary @issues.json \
+              --data-urlencode "prompt=$(cat prompt.txt)" >> gpt4-summary.md
+          done
+
+      - name: Upload GPT-4 summary to Azure Blob Storage
+        run: |
+          echo "Uploading GPT-4 summary..."
+          echo "--------"
+          cat gpt4-summary.md
+          az storage blob upload \
+            --account-name "$AZURE_STORAGE_ACCOUNT" \
+            --account-key "$AZURE_STORAGE_KEY" \
+            --container-name "gpt-summaries" \
+            --name "gpt4-summary-$(date +'%Y%m%d-%H%M%S').md" \
+            --file gpt4-summary.md
