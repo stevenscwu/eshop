@@ -116,7 +116,9 @@ jobs:
       
       - name: Chunk SonarQube report for GPT-4
         run: |
-          python3 .github/scripts/split_sonar_report.py
+          python3 .github/scripts/split_sonar_report.py \
+            report/${{ env.REPORT_DATE }}/sonar-report-${{ env.REPORT_DATE }}.json \
+            chunked-reports/sonar-report.json
 
       - name: GPT-4 AI Analysis
         run: |
