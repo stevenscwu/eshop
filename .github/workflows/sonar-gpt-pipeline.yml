@@ -128,8 +128,8 @@ jobs:
 
             curl -X POST "$AZURE_FUNCTION_URL" \
               -H "Content-Type: application/json" \
-              --data-binary @issues.json \
-              --data-urlencode "prompt=$(cat prompt.txt)" >> gpt4-summary.md
+              --data-urlencode "prompt=$(cat prompt.txt)" \
+              --data-binary @issues.json >> gpt4-summary.md
           done
 
       - name: Upload GPT-4 summary to Azure Blob Storage
