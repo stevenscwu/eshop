@@ -88,6 +88,15 @@ jobs:
             echo "WARNING: No issues found in SonarQube report. This might cause problems with the GPT analysis."
           fi
 
+      - name: Set timestamp
+        run: echo "REPORT_DATE=$(date +'%Y%m%d')" >> $GITHUB_ENV
+
+      - name: Create output directory
+        run: mkdir -p report/${{ env.REPORT_DATE }}
+
+      - name: Format SonarQube JSON
+        run: jq '.' sonar-report.json > report/${{ env.REPORT_DATE }}/sonar-report-${{ env.REPORT_DATE }}.json
+
       - name: Upload SonarQube Raw Report to Azure Blob
         env:
           AZURE_BLOB_SAS_URL: ${{ secrets.AZURE_BLOB_SAS_URL }}
