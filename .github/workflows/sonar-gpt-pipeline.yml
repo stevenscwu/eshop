@@ -144,26 +144,31 @@ jobs:
         env:
           AZURE_FUNCTION_URL: ${{ secrets.AZURE_FUNCTION_URL }}
         run: |
-          echo "Injecting prompt into GPT-4 request..."
-
-          # Write prompt from file
-          cat > prompt.txt <<'EOF'
+          echo "Creating prompt..."
+          cat << 'EOF' > prompt.txt
           You are a secure code reviewer with deep knowledge of software vulnerabilities. Given the following static analysis results from SonarQube (backend) and ESLint (frontend), perform the following tasks:
 
           1. Identify the top 10 most severe issues and explain why they are critical.
-
           2. Group issues by file/module and summarize their overall security and code quality state.
-
           3. Recommend specific refactoring or remediation actions for the top issues using secure coding best practices.
-
           4. Present your output in well-structured markdown, including:
+            - A prioritized issue summary table
+            - A per-module security assessment
+            - Actionable recommendations
+          EOF
 
-              - A prioritized issue summary table
+          echo "Merging prompt and SonarQube report into input.json"
+          jq -n --slurpfile report sonar-report-minified.json \
+                --rawfile prompt prompt.txt \
+                '{prompt: $prompt, report: $report[0]}' > input.json
 
-              - A per-module security assessment
+          echo "Sending to Azure Function..."
+          curl -s -S -X POST "$AZURE_FUNCTION_URL" \
+            -H "Content-Type: application/json" \
+            --data-binary @input.json > gpt4-summary.md
 
-              - Actionable recommendations
-            EOF
+          echo "GPT-4 summary written to gpt4-summary.md"
+
 
           # Merge prompt and minified JSON into a request body
           jq -n --slurpfile report sonar-report-minified.json \
