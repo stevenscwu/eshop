@@ -108,21 +108,19 @@ jobs:
 
       - name: Minify SonarQube JSON Report
         run: |
-          # Create stripped version of sonar-report-pretty.json
-          jq 'del(.issues[].effort, 
-                  .issues[].severity, 
-                  .issues[].type, 
-                  .issues[].component, 
-                  .issues[].project, 
-                  .issues[].organization,
-                  .issues[].author,
-                  .issues[].creationDate,
-                  .issues[].updateDate,
-                  .issues[].tags,
-                  .issues[].isNew)' sonar-report-pretty.json > sonar-report-minified.json
-
-          echo "Stripped JSON created as sonar-report-minified.json"
-
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          MINIFIED_FILE="sonar-report-minified-${TIMESTAMP}.json"
+          jq '{
+            issues: [.issues[] | {
+              message,
+              rule,
+              line,
+              file: .component
+            }],
+            total: .total
+          }' sonar-report-pretty.json > $MINIFIED_FILE
+          echo "$MINIFIED_FILE" > minified_filename.txt
+          echo "Minified report saved as $MINIFIED_FILE"
       - name: Upload Minified SonarQube Report to Azure Blob
         env:
           AZURE_BLOB_SAS_URL: ${{ secrets.AZURE_BLOB_SAS_URL }}
@@ -144,7 +142,8 @@ jobs:
         env:
           AZURE_FUNCTION_URL: ${{ secrets.AZURE_FUNCTION_URL }}
         run: |
-          echo "Creating prompt..."
+          MINIFIED_FILE=$(cat minified_filename.txt)
+
           cat << 'EOF' > prompt.txt
           You are a secure code reviewer with deep knowledge of software vulnerabilities. Given the following static analysis results from SonarQube (backend) and ESLint (frontend), perform the following tasks:
 
@@ -157,12 +156,8 @@ jobs:
             - Actionable recommendations
           EOF
 
-          echo "Merging prompt and SonarQube report into input.json"
-          jq -n --slurpfile report sonar-report-minified.json \
-                --rawfile prompt prompt.txt \
-                '{prompt: $prompt, report: $report[0]}' > input.json
+          jq -n --slurpfile report "$MINIFIED_FILE" --rawfile prompt prompt.txt '{prompt: $prompt, report: $report[0]}' > input.json
 
-          echo "Sending to Azure Function..."
           curl -s -S -X POST "$AZURE_FUNCTION_URL" \
             -H "Content-Type: application/json" \
             --data-binary @input.json > gpt4-summary.md
