@@ -88,15 +88,6 @@ jobs:
             echo "WARNING: No issues found in SonarQube report. This might cause problems with the GPT analysis."
           fi
 
-      - name: Set timestamp
-        run: echo "REPORT_DATE=$(date +'%Y%m%d')" >> $GITHUB_ENV
-
-      - name: Create output directory
-        run: mkdir -p report/${{ env.REPORT_DATE }}
-
-      - name: Format SonarQube JSON
-        run: jq '.' sonar-report.json > report/${{ env.REPORT_DATE }}/sonar-report-${{ env.REPORT_DATE }}.json
-
       - name: Upload SonarQube Raw Report to Azure Blob
         env:
           AZURE_BLOB_SAS_URL: ${{ secrets.AZURE_BLOB_SAS_URL }}
@@ -113,48 +104,3 @@ jobs:
           FOLDER_DATE=$(date +%Y%m%d)
           cp sonar-report-pretty.json "report/${FOLDER_DATE}/${FILENAME}"
           echo "SonarQube report saved to report/${FOLDER_DATE}/${FILENAME}"
-      
-      - name: Chunk SonarQube report for GPT-4
-        run: |
-          python3 .github/scripts/split_sonar_report.py \
-            report/${{ env.REPORT_DATE }}/sonar-report-${{ env.REPORT_DATE }}.json \
-            chunked-reports/sonar-report.json
-
-      - name: GPT-4 AI Analysis
-        run: |
-          for chunk in chunked-reports/*.json; do
-            jq -c '.' "$chunk" > input.json
-
-            echo "Sending $chunk to Azure Function..."
-            response=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "$AZURE_FUNCTION_URL" \
-              -H "Content-Type: application/json" \
-              --data-binary @input.json)
-
-            body=$(echo "$response" | sed -e '/HTTP_STATUS:/d')
-            status=$(echo "$response" | grep HTTP_STATUS | cut -d':' -f2)
-
-            if [ "$status" -ne 200 ]; then
-              echo "❌ Failed with status $status"
-              echo "$body" > error.log
-              cat error.log
-              exit 2
-            else
-              echo "$body" >> gpt4-summary.md
-              echo -e "\n--- End of $chunk ---\n" >> gpt4-summary.md
-            fi
-          done
-
-
-
-
-      - name: Upload GPT-4 summary to Azure Blob Storage
-        run: |
-          echo "Uploading GPT-4 summary..."
-          echo "--------"
-          cat gpt4-summary.md
-          az storage blob upload \
-            --account-name "$AZURE_STORAGE_ACCOUNT" \
-            --account-key "$AZURE_STORAGE_KEY" \
-            --container-name "gpt-summaries" \
-            --name "gpt4-summary-$(date +'%Y%m%d-%H%M%S').md" \
-            --file gpt4-summary.md
