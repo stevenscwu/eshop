@@ -181,6 +181,12 @@ jobs:
         env:
           AZURE_BLOB_SAS_URL: ${{ secrets.AZURE_BLOB_SAS_URL }}
         run: |
+          if [ ! -f gpt4-summary.md ]; then
+            echo "ERROR: gpt4-summary.md not found. Ensure the GPT-4 analysis step completed successfully."
+            exit 1
+          fi
+          echo "Uploading GPT-4 summary to Azure Blob Storage..."
+
           TIMESTAMP=$(date +%Y%m%d-%H%M%S)
           FILENAME="gpt4-summary-${TIMESTAMP}.md"
           SAS_URL="${AZURE_BLOB_SAS_URL}"
