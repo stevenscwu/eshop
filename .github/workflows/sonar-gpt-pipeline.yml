@@ -139,3 +139,53 @@ jobs:
           mkdir -p "report/${FOLDER_DATE}"                  
           cp sonar-report-minified.json "report/${FOLDER_DATE}/${FILENAME}"
           echo "Minified SonarQube report saved to report/${FOLDER_DATE}/${FILENAME}"
+
+      - name: Analyze Minified Report with GPT-4 via Azure Function
+        env:
+          AZURE_FUNCTION_URL: ${{ secrets.AZURE_FUNCTION_URL }}
+        run: |
+          echo "Injecting prompt into GPT-4 request..."
+
+          # Write prompt from file
+          cat > prompt.txt <<'EOF'
+          You are a secure code reviewer with deep knowledge of software vulnerabilities. Given the following static analysis results from SonarQube (backend) and ESLint (frontend), perform the following tasks:
+
+          1. Identify the top 10 most severe issues and explain why they are critical.
+
+          2. Group issues by file/module and summarize their overall security and code quality state.
+
+          3. Recommend specific refactoring or remediation actions for the top issues using secure coding best practices.
+
+          4. Present your output in well-structured markdown, including:
+
+              - A prioritized issue summary table
+
+              - A per-module security assessment
+
+              - Actionable recommendations
+            EOF
+
+          # Merge prompt and minified JSON into a request body
+          jq -n --slurpfile report sonar-report-minified.json \
+                --rawfile prompt prompt.txt \
+                '{prompt: $prompt, report: $report[0]}' > input.json
+
+          # Send request to Azure Function with GPT-4
+          curl -X POST "$AZURE_FUNCTION_URL" \
+            -H "Content-Type: application/json" \
+            --data-binary @input.json > gpt4-summary.md
+
+          echo "GPT-4 summary written to gpt4-summary.md"
+
+      - name: Upload GPT-4 Summary to Azure Blob
+        env:
+          AZURE_BLOB_SAS_URL: ${{ secrets.AZURE_BLOB_SAS_URL }}
+        run: |
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          FILENAME="gpt4-summary-${TIMESTAMP}.md"
+          SAS_URL="${AZURE_BLOB_SAS_URL}"
+          BASE_URL=$(echo "$SAS_URL" | cut -d'?' -f1)
+          SAS_TOKEN=$(echo "$SAS_URL" | cut -d'?' -f2-)
+          FULL_URL="${BASE_URL}/${FILENAME}?${SAS_TOKEN}"
+          curl -s -S -f -X PUT "$FULL_URL" -H "x-ms-blob-type: BlockBlob" --data-binary @gpt4-summary.md
+          echo "Uploaded GPT-4 summary to Azure Blob: $FILENAME"
