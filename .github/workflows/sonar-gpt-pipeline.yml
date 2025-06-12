@@ -105,3 +105,37 @@ jobs:
           mkdir -p "report/${FOLDER_DATE}"                  
           cp sonar-report-pretty.json "report/${FOLDER_DATE}/${FILENAME}"
           echo "SonarQube report saved to report/${FOLDER_DATE}/${FILENAME}"
+
+      - name: Minify SonarQube JSON Report
+        run: |
+          # Create stripped version of sonar-report-pretty.json
+          jq 'del(.issues[].effort, 
+                  .issues[].severity, 
+                  .issues[].type, 
+                  .issues[].component, 
+                  .issues[].project, 
+                  .issues[].organization,
+                  .issues[].author,
+                  .issues[].creationDate,
+                  .issues[].updateDate,
+                  .issues[].tags,
+                  .issues[].isNew)' sonar-report-pretty.json > sonar-report-minified.json
+
+          echo "Stripped JSON created as sonar-report-minified.json"
+
+      - name: Upload Minified SonarQube Report to Azure Blob
+        env:
+          AZURE_BLOB_SAS_URL: ${{ secrets.AZURE_BLOB_SAS_URL }}
+        run: |
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          FILENAME="sonar-report-minified-${TIMESTAMP}.json"
+          SAS_URL="${AZURE_BLOB_SAS_URL}"
+          BASE_URL=$(echo "$SAS_URL" | cut -d'?' -f1)
+          SAS_TOKEN=$(echo "$SAS_URL" | cut -d'?' -f2-)
+          FULL_URL="${BASE_URL}/${FILENAME}?${SAS_TOKEN}"
+          curl -s -S -f -X PUT "$FULL_URL" -H "x-ms-blob-type: BlockBlob" --data-binary @sonar-report-minified.json
+          
+          FOLDER_DATE=$(date +%Y%m%d)
+          mkdir -p "report/${FOLDER_DATE}"                  
+          cp sonar-report-minified.json "report/${FOLDER_DATE}/${FILENAME}"
+          echo "Minified SonarQube report saved to report/${FOLDER_DATE}/${FILENAME}"
