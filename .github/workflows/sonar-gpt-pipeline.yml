@@ -125,18 +125,19 @@ jobs:
         env:
           AZURE_BLOB_SAS_URL: ${{ secrets.AZURE_BLOB_SAS_URL }}
         run: |
+          MINIFIED_FILE=$(cat minified_filename.txt)
+
           TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-          FILENAME="sonar-report-minified-${TIMESTAMP}.json"
+          FILENAME="minified-upload-${TIMESTAMP}.json"
           SAS_URL="${AZURE_BLOB_SAS_URL}"
           BASE_URL=$(echo "$SAS_URL" | cut -d'?' -f1)
           SAS_TOKEN=$(echo "$SAS_URL" | cut -d'?' -f2-)
           FULL_URL="${BASE_URL}/${FILENAME}?${SAS_TOKEN}"
-          curl -s -S -f -X PUT "$FULL_URL" -H "x-ms-blob-type: BlockBlob" --data-binary @sonar-report-minified.json
-          
-          FOLDER_DATE=$(date +%Y%m%d)
-          mkdir -p "report/${FOLDER_DATE}"                  
-          cp sonar-report-minified.json "report/${FOLDER_DATE}/${FILENAME}"
-          echo "Minified SonarQube report saved to report/${FOLDER_DATE}/${FILENAME}"
+
+          curl -s -S -f -X PUT "$FULL_URL" -H "x-ms-blob-type: BlockBlob" --data-binary @"$MINIFIED_FILE"
+
+          echo "Minified SonarQube report $MINIFIED_FILE uploaded to Azure Blob as $FILENAME"
+
 
       - name: Analyze Minified Report with GPT-4 via Azure Function
         env:
