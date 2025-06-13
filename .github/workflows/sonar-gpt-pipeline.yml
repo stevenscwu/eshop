@@ -181,7 +181,8 @@ jobs:
           # Create the input JSON for the Azure Function
           echo "Creating input JSON with prompt and report..."
           jq -n --slurpfile report "$MINIFIED_FILE" --rawfile prompt prompt.txt \
-            '{prompt: $prompt, report: $report[0]}' > input.json
+            '{prompt: $prompt, issues: $report[0].issues}' > input.json
+
           
           # Verify input.json was created and is valid
           if [ ! -s input.json ] || ! jq empty input.json > /dev/null 2>&1; then
