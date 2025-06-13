@@ -151,6 +151,12 @@ jobs:
             - A per-module security assessment
             - Actionable recommendations' > prompt.txt
 
+      - name: Create input.json for GPT-4
+        run: |
+          MINIFIED_FILE=$(cat minified_filename.txt)
+          jq -n --slurpfile report "$MINIFIED_FILE" --rawfile prompt prompt.txt \
+            '{prompt: $prompt, issues: $report[0].issues}' > input.json
+
       - name: Analyze Minified Report with GPT-4 via Azure Function
         env:
           AZURE_FUNCTION_URL: ${{ secrets.AZURE_FUNCTION_URL }}
