@@ -104,23 +104,38 @@ jobs:
           FOLDER_DATE=$(date +%Y%m%d)
           mkdir -p "report/${FOLDER_DATE}"                  
           cp sonar-report-pretty.json "report/${FOLDER_DATE}/${FILENAME}"
-          echo "SonarQube report saved to report/${FOLDER_DATE}/${FILENAME}"
-
-      - name: Minify SonarQube JSON Report
+          echo "SonarQube report saved to report/${FOLDER_DATE}/${FILENAME}"      - name: Minify SonarQube JSON Report
         run: |
           TIMESTAMP=$(date +%Y%m%d-%H%M%S)
           MINIFIED_FILE="sonar-report-minified-${TIMESTAMP}.json"
+          
+          # Ensure output has the exact structure expected by Azure Function
+          # key, rule, severity, component are essential fields
           jq '{
             issues: [.issues[] | {
-              message,
-              rule,
-              line,
-              file: .component
+              key: (.key // ("issue-" + (.component // "" | split(":")[1] // "" | gsub("/"; "-")))),
+              rule: .rule // "unknown-rule",
+              severity: .severity // "MAJOR",
+              component: .component // .file, 
+              project: .project // "eshop",
+              line: .line // 1,
+              message: .message // "Unknown issue",
+              type: .type // "CODE_SMELL"
             }],
+            components: (.components // [] | map({key, path, qualifier}) | if length > 50 then .[0:50] else . end),
             total: .total
-          }' sonar-report-pretty.json > $MINIFIED_FILE
+          }' sonar-report.json > $MINIFIED_FILE
+          
+          # Validate minified file structure
+          echo "Validating minified report structure..."
+          if ! jq -e '.issues' $MINIFIED_FILE > /dev/null; then
+            echo "ERROR: Minified report is missing 'issues' array"
+            exit 1
+          fi
+          
           echo "$MINIFIED_FILE" > minified_filename.txt
           echo "Minified report saved as $MINIFIED_FILE"
+          echo "Contains $(jq '.issues | length' $MINIFIED_FILE) issues"
           
       - name: Upload Minified SonarQube Report to Azure Blob
         env:
@@ -149,13 +164,22 @@ jobs:
           4. Present your output in well-structured markdown, including:
             - A prioritized issue summary table
             - A per-module security assessment
-            - Actionable recommendations' > prompt.txt
-
+            - Actionable recommendations' > prompt.txt      
       - name: Create input.json for GPT-4
         run: |
           MINIFIED_FILE=$(cat minified_filename.txt)
+          
+          # Create proper input format for Azure Function - it expects "report" object containing issues
           jq -n --slurpfile report "$MINIFIED_FILE" --rawfile prompt prompt.txt \
-            '{prompt: $prompt, issues: $report[0].issues}' > input.json
+            '{
+              prompt: $prompt, 
+              report: $report[0]
+            }' > input.json
+            
+          # Debug the input structure
+          echo "Input JSON structure:"
+          jq 'keys' input.json
+          jq '.report | keys' input.json
 
       - name: Analyze Minified Report with GPT-4 via Azure Function
         env:
@@ -177,11 +201,16 @@ jobs:
             echo "# GPT-4 Analysis Error: Minified report not found" > gpt4-summary.md
             exit 0
           fi
+            # Input JSON was already created in the previous step
+          echo "Using previously created input.json"
           
-          # Create the input JSON for the Azure Function
-          echo "Creating input JSON with prompt and report..."
-          jq -n --slurpfile report "$MINIFIED_FILE" --rawfile prompt prompt.txt \
-            '{prompt: $prompt, issues: $report[0].issues}' > input.json
+          # Verify input.json has the correct structure
+          echo "Verifying input.json structure..."
+          if ! jq -e '.report.issues' input.json > /dev/null; then
+            echo "ERROR: input.json doesn't have the correct structure. Missing .report.issues field"
+            echo "# GPT-4 Analysis Error: Invalid request payload format" > gpt4-summary.md
+            exit 0
+          fi
 
           
           # Verify input.json was created and is valid
@@ -190,14 +219,23 @@ jobs:
             echo "# GPT-4 Analysis Error: Failed to create request payload" > gpt4-summary.md
             exit 0
           fi
-          
-          # Call the Azure Function with proper error handling
+            # Call the Azure Function with proper error handling
           echo "Calling Azure Function for analysis..."
-          HTTP_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$AZURE_FUNCTION_URL" \
+          echo "Input JSON structure:"
+          jq 'keys' input.json
+          
+          # Store the sample structure for debugging
+          echo "First few issues from input:"
+          jq '.report.issues[0:3]' input.json
+            
+          # Add debugging headers to see more info on errors
+          HTTP_RESPONSE=$(curl -s -v -w "\n%{http_code}" -X POST "$AZURE_FUNCTION_URL" \
             -H "Content-Type: application/json" \
             -H "Accept: text/markdown" \
-            --max-time 180 \
-            --data-binary @input.json)
+            --max-time 300 \
+            --retry 3 \
+            --retry-max-time 900 \
+            --data-binary @input.json 2>&1)
           
           # Extract status code and body
           HTTP_BODY=$(echo "$HTTP_RESPONSE" | sed '$d')
