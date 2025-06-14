@@ -104,7 +104,8 @@ jobs:
           FOLDER_DATE=$(date +%Y%m%d)
           mkdir -p "report/${FOLDER_DATE}"                  
           cp sonar-report-pretty.json "report/${FOLDER_DATE}/${FILENAME}"
-          echo "SonarQube report saved to report/${FOLDER_DATE}/${FILENAME}"      - name: Minify SonarQube JSON Report
+          echo "SonarQube report saved to report/${FOLDER_DATE}/${FILENAME}"      
+      - name: Minify SonarQube JSON Report
         run: |
           TIMESTAMP=$(date +%Y%m%d-%H%M%S)
           MINIFIED_FILE="sonar-report-minified-${TIMESTAMP}.json"
