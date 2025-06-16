@@ -104,39 +104,23 @@ jobs:
           FOLDER_DATE=$(date +%Y%m%d)
           mkdir -p "report/${FOLDER_DATE}"                  
           cp sonar-report-pretty.json "report/${FOLDER_DATE}/${FILENAME}"
-          echo "SonarQube report saved to report/${FOLDER_DATE}/${FILENAME}"      - name: Minify SonarQube JSON Report
+          echo "SonarQube report saved to report/${FOLDER_DATE}/${FILENAME}"
+
+      - name: Minify SonarQube JSON Report
         run: |
           TIMESTAMP=$(date +%Y%m%d-%H%M%S)
           MINIFIED_FILE="sonar-report-minified-${TIMESTAMP}.json"
-          
-          # Preserve the original structure but reduce fields to minimize size
-          # Keep the 'issues' array with the same structure expected by the Azure Function
           jq '{
             issues: [.issues[] | {
-              key: .key,
-              rule: .rule,
-              severity: .severity,
-              component: .component,
-              project: .project,
-              line: .line,
-              message: .message,
-              type: .type
+              message,
+              rule,
+              line,
+              file: .component
             }],
-            components: (.components | map({key, path, qualifier})),
             total: .total
           }' sonar-report-pretty.json > $MINIFIED_FILE
-          
-          # Verify the output has the required structure
-          if ! jq -e '.issues' $MINIFIED_FILE > /dev/null; then
-            echo "ERROR: Minified JSON doesn't have the required 'issues' field"
-            jq '.' sonar-report-pretty.json | head -n 20
-            exit 1
-          fi
-          
           echo "$MINIFIED_FILE" > minified_filename.txt
           echo "Minified report saved as $MINIFIED_FILE"
-          echo "Issues count: $(jq '.issues | length' $MINIFIED_FILE)"
-          
       - name: Upload Minified SonarQube Report to Azure Blob
         env:
           AZURE_BLOB_SAS_URL: ${{ secrets.AZURE_BLOB_SAS_URL }}
@@ -154,17 +138,6 @@ jobs:
 
           echo "Minified SonarQube report $MINIFIED_FILE uploaded to Azure Blob as $FILENAME"
 
-      - name: Create GPT-4 Prompt
-        run: |
-          echo 'You are a secure code reviewer with deep knowledge of software vulnerabilities. Given the following static analysis results from SonarQube (backend) and ESLint (frontend), perform the following tasks:
-
-          1. Identify the top 10 most severe issues and explain why they are critical.
-          2. Group issues by file/module and summarize their overall security and code quality state.
-          3. Recommend specific refactoring or remediation actions for the top issues using secure coding best practices.
-          4. Present your output in well-structured markdown, including:
-            - A prioritized issue summary table
-            - A per-module security assessment
-            - Actionable recommendations' > prompt.txt
 
       - name: Analyze Minified Report with GPT-4 via Azure Function
         env:
@@ -180,25 +153,30 @@ jobs:
             exit 0
           fi
           
+          # Create the prompt file with proper EOF delimiter
+          cat > prompt.txt << 'EOFMARKER'
+You are a secure code reviewer with deep knowledge of software vulnerabilities. Given the following static analysis results from SonarQube (backend) and ESLint (frontend), perform the following tasks:
+
+1. Identify the top 10 most severe issues and explain why they are critical.
+2. Group issues by file/module and summarize their overall security and code quality state.
+3. Recommend specific refactoring or remediation actions for the top issues using secure coding best practices.
+4. Present your output in well-structured markdown, including:
+  - A prioritized issue summary table
+  - A per-module security assessment
+  - Actionable recommendations
+EOFMARKER
+
           # Validate the minified file exists
           if [ ! -f "$MINIFIED_FILE" ]; then
             echo "ERROR: Minified file $MINIFIED_FILE not found"
             echo "# GPT-4 Analysis Error: Minified report not found" > gpt4-summary.md
             exit 0
           fi
-            # Create the input JSON for the Azure Function
+          
+          # Create the input JSON for the Azure Function
           echo "Creating input JSON with prompt and report..."
           jq -n --slurpfile report "$MINIFIED_FILE" --rawfile prompt prompt.txt \
-            '{
-              prompt: $prompt, 
-              report: $report[0]
-            }' > input.json
-            
-          # Debug the input structure
-          echo "Input JSON structure:"
-          jq -c 'keys' input.json
-          echo "Report keys:"
-          jq -c '.report | keys' input.json
+            '{prompt: $prompt, report: $report[0]}' > input.json
           
           # Verify input.json was created and is valid
           if [ ! -s input.json ] || ! jq empty input.json > /dev/null 2>&1; then
@@ -222,7 +200,6 @@ jobs:
           if [ "$HTTP_STATUS" -eq 200 ]; then
             echo "$HTTP_BODY" > gpt4-summary.md
             echo "✅ GPT-4 summary written to gpt4-summary.md"
-            ls -la gpt4-summary.md
           else
             echo "❌ Error calling Azure Function: HTTP status $HTTP_STATUS"
             echo "# GPT-4 Analysis Error" > gpt4-summary.md
@@ -235,21 +212,16 @@ jobs:
             echo '```' >> gpt4-summary.md
           fi
 
+
       - name: Upload GPT-4 Summary to Azure Blob
-        if: always()
         env:
           AZURE_BLOB_SAS_URL: ${{ secrets.AZURE_BLOB_SAS_URL }}
         run: |
           if [ ! -f gpt4-summary.md ]; then
-            echo "ERROR: gpt4-summary.md not found. Creating a minimal file."
-            echo "# GPT-4 Analysis Could Not Be Generated" > gpt4-summary.md
-            echo "" >> gpt4-summary.md
-            echo "The GPT-4 analysis step encountered an error. Please check the workflow logs for details." >> gpt4-summary.md
+            echo "ERROR: gpt4-summary.md not found. Ensure the GPT-4 analysis step completed successfully."
+            exit 1
           fi
-          
           echo "Uploading GPT-4 summary to Azure Blob Storage..."
-          echo "File exists check: $(ls -la gpt4-summary.md || echo 'File not found')"
-          echo "File size: $(wc -c gpt4-summary.md || echo 'Cannot check size')"
 
           TIMESTAMP=$(date +%Y%m%d-%H%M%S)
           FILENAME="gpt4-summary-${TIMESTAMP}.md"
