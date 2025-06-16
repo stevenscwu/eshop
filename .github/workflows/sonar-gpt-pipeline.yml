@@ -104,28 +104,42 @@ jobs:
           FOLDER_DATE=$(date +%Y%m%d)
           mkdir -p "report/${FOLDER_DATE}"                  
           cp sonar-report-pretty.json "report/${FOLDER_DATE}/${FILENAME}"
-          echo "SonarQube report saved to report/${FOLDER_DATE}/${FILENAME}"      
+          echo "SonarQube report saved to report/${FOLDER_DATE}/${FILENAME}"
+
       - name: Minify SonarQube JSON Report
         run: |
           TIMESTAMP=$(date +%Y%m%d-%H%M%S)
           MINIFIED_FILE="sonar-report-minified-${TIMESTAMP}.json"
           
-          # Ensure output has the exact structure expected by Azure Function
-          # key, rule, severity, component are essential fields
-          jq '{
-            issues: [.issues[] | {
-              key: (.key // ("issue-" + (.component // "" | split(":")[1] // "" | gsub("/"; "-")))),
-              rule: .rule // "unknown-rule",
-              severity: .severity // "MAJOR",
-              component: .component // .file, 
-              project: .project // "eshop",
-              line: .line // 1,
-              message: .message // "Unknown issue",
-              type: .type // "CODE_SMELL"
-            }],
-            components: (.components // [] | map({key, path, qualifier}) | if length > 50 then .[0:50] else . end),
-            total: .total
-          }' sonar-report.json > $MINIFIED_FILE
+          # Create a sanitized report with proper structure for Azure Function
+          # Ensure all required fields are present with fallbacks
+          jq '
+          {
+            issues: [
+              .issues[] | 
+              {
+                key: (.key // ("issue-" + (.component // "unknown" | split(":")[1] // "file" | gsub("/"; "-")))),
+                rule: (.rule // "unknown-rule"),
+                severity: (.severity // "MAJOR"),
+                component: (.component // .file // "unknown-component"),
+                project: (.project // "eshop"),
+                line: (.line // 1),
+                message: (.message // "Unknown issue description"),
+                type: (.type // "CODE_SMELL")
+              }
+            ],
+            components: (
+              .components // [] | 
+              map({
+                key: (.key // .path // "unknown-component"),
+                path: (.path // "unknown-path"),
+                qualifier: (.qualifier // "FIL")
+              }) | 
+              if length > 50 then .[0:50] else . end
+            ),
+            total: (.total // (.issues | length))
+          }
+          ' sonar-report.json > $MINIFIED_FILE
           
           # Validate minified file structure
           echo "Validating minified report structure..."
@@ -157,15 +171,18 @@ jobs:
 
       - name: Create GPT-4 Prompt
         run: |
-          echo 'You are a secure code reviewer with deep knowledge of software vulnerabilities. Given the following static analysis results from SonarQube (backend) and ESLint (frontend), perform the following tasks:
+          cat > prompt.txt << 'EOF'
+You are a secure code reviewer with deep knowledge of software vulnerabilities. Given the following static analysis results from SonarQube (backend) and ESLint (frontend), perform the following tasks:
 
-          1. Identify the top 10 most severe issues and explain why they are critical.
-          2. Group issues by file/module and summarize their overall security and code quality state.
-          3. Recommend specific refactoring or remediation actions for the top issues using secure coding best practices.
-          4. Present your output in well-structured markdown, including:
-            - A prioritized issue summary table
-            - A per-module security assessment
-            - Actionable recommendations' > prompt.txt      
+1. Identify the top 10 most severe issues and explain why they are critical.
+2. Group issues by file/module and summarize their overall security and code quality state.
+3. Recommend specific refactoring or remediation actions for the top issues using secure coding best practices.
+4. Present your output in well-structured markdown, including:
+  - A prioritized issue summary table
+  - A per-module security assessment
+  - Actionable recommendations
+EOF
+
       - name: Create input.json for GPT-4
         run: |
           MINIFIED_FILE=$(cat minified_filename.txt)
@@ -202,7 +219,8 @@ jobs:
             echo "# GPT-4 Analysis Error: Minified report not found" > gpt4-summary.md
             exit 0
           fi
-            # Input JSON was already created in the previous step
+          
+          # Input JSON was already created in the previous step
           echo "Using previously created input.json"
           
           # Verify input.json has the correct structure
@@ -213,14 +231,14 @@ jobs:
             exit 0
           fi
 
-          
           # Verify input.json was created and is valid
           if [ ! -s input.json ] || ! jq empty input.json > /dev/null 2>&1; then
             echo "ERROR: Failed to create valid input.json"
             echo "# GPT-4 Analysis Error: Failed to create request payload" > gpt4-summary.md
             exit 0
           fi
-            # Call the Azure Function with proper error handling
+          
+          # Call the Azure Function with proper error handling
           echo "Calling Azure Function for analysis..."
           echo "Input JSON structure:"
           jq 'keys' input.json
@@ -230,7 +248,7 @@ jobs:
           jq '.report.issues[0:3]' input.json
             
           # Add debugging headers to see more info on errors
-          HTTP_RESPONSE=$(curl -s -v -w "\n%{http_code}" -X POST "$AZURE_FUNCTION_URL" \
+          HTTP_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$AZURE_FUNCTION_URL" \
             -H "Content-Type: application/json" \
             -H "Accept: text/markdown" \
             --max-time 300 \
