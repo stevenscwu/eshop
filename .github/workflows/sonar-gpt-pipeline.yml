@@ -105,3 +105,20 @@ jobs:
           mkdir -p "report/${FOLDER_DATE}"                  
           cp sonar-report-pretty.json "report/${FOLDER_DATE}/${FILENAME}"
           echo "SonarQube report saved to report/${FOLDER_DATE}/${FILENAME}"
+
+      - name: Get SonarQube report filename
+        id: find_report
+        run: |
+          REPORT_FILE=$(ls sonar-report-*.json | head -n 1)
+          echo "report_file=$REPORT_FILE" >> $GITHUB_OUTPUT
+
+      - name: Minify SonarQube report
+        run: |
+          pip install jq
+          jq '{issues: [.issues[] | {file: .component, message: .message, severity: .severity, rule: .rule}]}' "${{ steps.find_report.outputs.report_file }}" > reduced-sonar-report.json
+
+      - name: Upload reduced report via SAS URL
+        run: |
+          curl -X PUT -T "reduced-sonar-report.json" "${{ secrets.AZURE_BLOB_SAS_URL }}" \
+            -H "x-ms-blob-type: BlockBlob" \
+            -H "x-ms-version: 2021-10-04"
