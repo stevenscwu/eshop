@@ -90,6 +90,10 @@ jobs:
           fi
 
       - name: Upload SonarQube Raw Report to Azure Blob
+        env:
+          DOTNET_ROOT: /usr/share/dotnet
+          AZURE_BLOB_SAS_URL: ${{ secrets.AZURE_BLOB_SAS_URL }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
           sudo apt-get update && sudo apt-get install -y jq
 
