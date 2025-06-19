@@ -146,7 +146,7 @@ jobs:
           echo "$RESPONSE" > gpt-summary-${TIMESTAMP}.md
 
           # Upload the summary back to Azure Blob (optional)
-          curl -s -S -f -X PUT "${AZURE_BLOB_BASE_URL}/gpt-summary-${TIMESTAMP}.md?${AZURE_BLOB_SAS_TOKEN}" \
+          curl -s -S -f -X PUT "${AZURE_BLOB_SAS_URL}/gpt-summary-${TIMESTAMP}.md?${AZURE_BLOB_SAS_TOKEN}" \
             -H "x-ms-blob-type: BlockBlob" \
             -H "x-ms-version: 2021-10-04" \
             --data-binary "@gpt-summary-${TIMESTAMP}.md"
