@@ -127,7 +127,7 @@ jobs:
 
       - name: Summarize SonarQube Issues via GPT-4 on Azure Function
         env:
-          AZURE_BLOB_BASE_URL: ${{ secrets.AZURE_BLOB_SAS_URL }}
+          AZURE_BLOB_SAS_URL: ${{ secrets.AZURE_BLOB_SAS_URL }}
           AZURE_BLOB_SAS_TOKEN: ${{ secrets.AZURE_BLOB_SAS_TOKEN }}
           AZURE_FUNCTION_URL: ${{ secrets.AZURE_FUNCTION_URL }}
           AZURE_FUNCTION_KEY: ${{ secrets.AZURE_FUNCTION_KEY }}
