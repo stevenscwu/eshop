@@ -89,36 +89,36 @@ jobs:
           fi
 
       - name: Upload SonarQube Raw Report to Azure Blob
-        env:
-          AZURE_BLOB_SAS_URL: ${{ secrets.AZURE_BLOB_SAS_URL }}
         run: |
-          jq '.' sonar-report.json > sonar-report-pretty.json
+          sudo apt-get update && sudo apt-get install -y jq
+
           TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-          FILENAME="sonar-report-${TIMESTAMP}.json"
+          FOLDER_DATE=$(date +%Y%m%d)
+
           SAS_URL="${AZURE_BLOB_SAS_URL}"
           BASE_URL=$(echo "$SAS_URL" | cut -d'?' -f1)
           SAS_TOKEN=$(echo "$SAS_URL" | cut -d'?' -f2-)
-          FULL_URL="${BASE_URL}/${FILENAME}?${SAS_TOKEN}"
-          curl -s -S -f -X PUT "$FULL_URL" -H "x-ms-blob-type: BlockBlob" --data-binary @sonar-report-pretty.json
-          
-          FOLDER_DATE=$(date +%Y%m%d)
-          mkdir -p "report/${FOLDER_DATE}"                  
-          cp sonar-report-pretty.json "report/${FOLDER_DATE}/${FILENAME}"
-          echo "SonarQube report saved to report/${FOLDER_DATE}/${FILENAME}"
 
-      - name: Get SonarQube report filename
-        id: find_report
-        run: |
-          REPORT_FILE=$(ls sonar-report-*.json | head -n 1)
-          echo "report_file=$REPORT_FILE" >> $GITHUB_OUTPUT
+          # Create beautified version of sonar-report.json
+          BEAUTIFIED="sonar-report-${TIMESTAMP}.json"
+          jq '.' sonar-report.json > "$BEAUTIFIED"
 
-      - name: Minify SonarQube report
-        run: |
-          pip install jq
-          jq '{issues: [.issues[] | {file: .component, message: .message, severity: .severity, rule: .rule}]}' "${{ steps.find_report.outputs.report_file }}" > reduced-sonar-report.json
+          # Create reduced version for GPT
+          REDUCED="reduced-sonar-report-${TIMESTAMP}.json"
+          jq '{issues: [.issues[] | {file: .component, message: .message, severity: .severity, rule: .rule}]}' "$BEAUTIFIED" > "$REDUCED"
 
-      - name: Upload reduced report via SAS URL
-        run: |
-          curl -X PUT -T "reduced-sonar-report.json" "${{ secrets.AZURE_BLOB_SAS_URL }}" \
-            -H "x-ms-blob-type: BlockBlob" \
-            -H "x-ms-version: 2021-10-04"
+          # Upload both files to Azure Blob
+          for FILE in "$BEAUTIFIED" "$REDUCED"; do
+            curl -s -S -f -X PUT "${BASE_URL}/${FILE}?${SAS_TOKEN}" \
+              -H "x-ms-blob-type: BlockBlob" \
+              -H "x-ms-version: 2021-10-04" \
+              --data-binary @"$FILE"
+          done
+
+          mkdir -p "report/${FOLDER_DATE}"
+          cp "$BEAUTIFIED" "report/${FOLDER_DATE}/"
+          cp "$REDUCED" "report/${FOLDER_DATE}/"
+          echo "Reports saved to report/${FOLDER_DATE}/"
+
+
+    
