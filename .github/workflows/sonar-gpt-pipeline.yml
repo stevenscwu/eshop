@@ -139,9 +139,10 @@ jobs:
           curl -o "$REDUCED" "${AZURE_BLOB_SAS_URL}/${REDUCED}"
 
           # Call Azure Function
-          RESPONSE=$(curl -s -X POST "$AZURE_FUNCTION_URL" \
+          curl -s -X POST "$AZURE_FUNCTION_URL" \
             -H "Content-Type: application/json" \
-            --data-binary "@$REDUCED")
+            -H "x-functions-key: $AZURE_FUNCTION_KEY" \
+            --data-binary "@$REDUCED"
 
           echo "$RESPONSE" > gpt-summary-${TIMESTAMP}.md
 
