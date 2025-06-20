@@ -134,23 +134,23 @@ jobs:
         run: |
           TIMESTAMP=$(date +%Y%m%d-%H%M%S)
           REDUCED="reduced-sonar-report-${TIMESTAMP}.json"
-          
-          # Download reduced report from blob
-          curl -o "$REDUCED" "${AZURE_BLOB_SAS_URL}/${REDUCED}"
 
-          # Call Azure Function
-          echo "Downloaded JSON content:"
-          cat "$REDUCED"
+          echo "🔽 Downloading $REDUCED"
+          curl -o "$REDUCED" "${AZURE_BLOB_SAS_URL}/${REDUCED}?${AZURE_BLOB_SAS_TOKEN}"
+
+          echo "📄 Validating JSON"
           jq empty "$REDUCED" || (echo "❌ Invalid JSON format!" && exit 1)
 
-          curl -s -X POST "$AZURE_FUNCTION_URL" \
+          echo "📡 Calling Azure Function..."
+          RESPONSE=$(curl -s -X POST "$AZURE_FUNCTION_URL" \
             -H "Content-Type: application/json" \
             -H "x-functions-key: $AZURE_FUNCTION_KEY" \
-            --data-binary "@$REDUCED"
+            --data-binary "@$REDUCED")
 
           echo "$RESPONSE" > gpt-summary-${TIMESTAMP}.md
+          echo "✅ Saved GPT-4 summary to gpt-summary-${TIMESTAMP}.md"
 
-          # Upload the summary back to Azure Blob (optional)
+          echo "☁️ Uploading to Azure Blob..."
           curl -s -S -f -X PUT "${AZURE_BLOB_SAS_URL}/gpt-summary-${TIMESTAMP}.md?${AZURE_BLOB_SAS_TOKEN}" \
             -H "x-ms-blob-type: BlockBlob" \
             -H "x-ms-version: 2021-10-04" \
