@@ -4,6 +4,8 @@ import json
 import azure.functions as func
 import os
 
+# Trigger redeploy from GitHub Actions
+
 openai.api_key = os.getenv("OPENAI_API_KEY")
 openai.api_type = "azure"
 openai.api_base = os.getenv("OPENAI_API_BASE")
