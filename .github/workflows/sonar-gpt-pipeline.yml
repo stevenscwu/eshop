@@ -132,9 +132,8 @@ jobs:
           AZURE_FUNCTION_URL: ${{ secrets.AZURE_FUNCTION_URL }}
           AZURE_FUNCTION_KEY: ${{ secrets.AZURE_FUNCTION_KEY }}
         run: |
-          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-          REDUCED="reduced-sonar-report-${TIMESTAMP}.json"
-
+          DATE=$(date +%Y%m%d)
+          REDUCED="reduced-sonar-report-${DATE}.json"
           echo "🔽 Downloading $REDUCED"
           curl -o "$REDUCED" "${AZURE_BLOB_SAS_URL}/${REDUCED}?${AZURE_BLOB_SAS_TOKEN}"
 
@@ -147,14 +146,14 @@ jobs:
             -H "x-functions-key: $AZURE_FUNCTION_KEY" \
             --data-binary "@$REDUCED")
 
-          echo "$RESPONSE" > gpt-summary-${TIMESTAMP}.md
-          echo "✅ Saved GPT-4 summary to gpt-summary-${TIMESTAMP}.md"
+          echo "$RESPONSE" > gpt-summary-${DATE}.md
+          echo "✅ Saved GPT-4 summary to gpt-summary-${DATE}.md"
 
           echo "☁️ Uploading to Azure Blob..."
-          curl -s -S -f -X PUT "${AZURE_BLOB_SAS_URL}/gpt-summary-${TIMESTAMP}.md?${AZURE_BLOB_SAS_TOKEN}" \
+          curl -s -S -f -X PUT "${AZURE_BLOB_SAS_URL}/gpt-summary-${DATE}.md?${AZURE_BLOB_SAS_TOKEN}" \
             -H "x-ms-blob-type: BlockBlob" \
             -H "x-ms-version: 2021-10-04" \
-            --data-binary "@gpt-summary-${TIMESTAMP}.md"
+            --data-binary "@gpt-summary-${DATE}.md"
 
 
     
