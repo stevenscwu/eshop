@@ -1,0 +1,17 @@
+{
+  "prompt": "You are a secure code reviewer. Summarize the following issues:",
+  "issues": [
+    {
+      "message": "Hardcoded password detected",
+      "rule": "csharpsquid:S2068",
+      "file": "AuthController.cs",
+      "line": 27
+    },
+    {
+      "message": "SQL injection risk via user input",
+      "rule": "security-sql-injection",
+      "file": "DatabaseHelper.cs",
+      "line": 83
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+    "sonarlint.connectedMode.project": {
+        "connectionId": "http://13.89.226.182:9000",
+        "projectKey": "eshop"
+    },
+    "azureFunctions.deploySubpath": ".",
+    "azureFunctions.scmDoBuildDuringDeployment": true,
+    "azureFunctions.pythonVenv": ".venv",
+    "azureFunctions.projectLanguage": "Python",
+    "azureFunctions.projectRuntime": "~4",
+    "debug.internalConsoleOptions": "neverOpen",
+    "azureFunctions.projectLanguageModel": 2
+}

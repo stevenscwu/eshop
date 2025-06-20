@@ -1,0 +1,37 @@
+{
+  "issues": [
+    {
+      "key": "AX1",
+      "rule": "csharp:S1144",
+      "severity": "MAJOR",
+      "component": "src/ApplicationCore/Services/BasketService.cs",
+      "project": "eshop",
+      "line": 50,
+      "message": "Remove this unused private method.",
+      "type": "CODE_SMELL"
+    },
+    {
+      "key": "AX2",
+      "rule": "csharp:S3776",
+      "severity": "CRITICAL",
+      "component": "src/Web/Controllers/AccountController.cs",
+      "project": "eshop",
+      "line": 45,
+      "message": "Refactor this method to reduce its Cognitive Complexity from 29 to the 15 allowed.",
+      "type": "CODE_SMELL"
+    }
+  ],
+  "components": [
+    {
+      "key": "src/ApplicationCore/Services/BasketService.cs",
+      "path": "src/ApplicationCore/Services/BasketService.cs",
+      "qualifier": "FIL"
+    },
+    {
+      "key": "src/Web/Controllers/AccountController.cs",
+      "path": "src/Web/Controllers/AccountController.cs",
+      "qualifier": "FIL"
+    }
+  ],
+  "total": 2
+}

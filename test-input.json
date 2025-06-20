@@ -1,0 +1,40 @@
+{
+  "prompt": "You are a secure code reviewer with deep knowledge of software vulnerabilities. Given the following static analysis results from SonarQube (backend) and ESLint (frontend), perform the following tasks:\n\n1. Identify the top 10 most severe issues and explain why they are critical.\n2. Group issues by file/module and summarize their overall security and code quality state.\n3. Recommend specific refactoring or remediation actions for the top issues using secure coding best practices.\n4. Present your output in well-structured markdown, including:\n  - A prioritized issue summary table\n  - A per-module security assessment\n  - Actionable recommendations",
+  "report": {
+    "issues": [
+      {
+        "key": "AX1",
+        "rule": "csharp:S1144",
+        "severity": "MAJOR",
+        "component": "src/ApplicationCore/Services/BasketService.cs",
+        "project": "eshop",
+        "line": 50,
+        "message": "Remove this unused private method.",
+        "type": "CODE_SMELL"
+      },
+      {
+        "key": "AX2",
+        "rule": "csharp:S3900",
+        "severity": "MINOR",
+        "component": "src/Web/Controllers/OrderController.cs",
+        "project": "eshop",
+        "line": 25,
+        "message": "Make this class sealed or add virtual/abstract methods.",
+        "type": "CODE_SMELL"
+      }
+    ],
+    "components": [
+      {
+        "key": "src/ApplicationCore/Services/BasketService.cs",
+        "path": "src/ApplicationCore/Services/BasketService.cs",
+        "qualifier": "FIL"
+      },
+      {
+        "key": "src/Web/Controllers/OrderController.cs",
+        "path": "src/Web/Controllers/OrderController.cs",
+        "qualifier": "FIL"
+      }
+    ],
+    "total": 2
+  }
+}

@@ -1,0 +1,8 @@
+﻿2025-06-13T08:43:21.8151681Z ##[group]Run MINIFIED_FILE=$(cat minified_filename.txt)
+2025-06-13T08:43:21.8152063Z [36;1mMINIFIED_FILE=$(cat minified_filename.txt)[0m
+2025-06-13T08:43:21.8152482Z [36;1mjq -n --slurpfile report "$MINIFIED_FILE" --rawfile prompt prompt.txt \[0m
+2025-06-13T08:43:21.8152925Z [36;1m  '{prompt: $prompt, issues: $report[0].issues}' > input.json[0m
+2025-06-13T08:43:21.8203028Z shell: /usr/bin/bash -e {0}
+2025-06-13T08:43:21.8203257Z env:
+2025-06-13T08:43:21.8203444Z   DOTNET_ROOT: /usr/share/dotnet
+2025-06-13T08:43:21.8203669Z ##[endgroup]

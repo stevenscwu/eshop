@@ -36,7 +36,6 @@ jobs:
             /k:"eshop" \
             /d:sonar.login="${SONAR_TOKEN}" \
             /d:sonar.host.url="${SONAR_HOST_URL}" \
-            /d:sonar.report.export.path=sonar-report.json \
             /d:sonar.verbose=true \
             /d:sonar.exclusions="**/obj/**,**/bin/**,**/*.json,**/BlazorAdmin/**,infra/core/database/sqlserver/**,infra/core/security/keyvault.bicep,infra/core/host/appservice.bicep"
 
@@ -91,70 +90,52 @@ jobs:
 
       - name: Upload SonarQube Raw Report to Azure Blob
         env:
-          DOTNET_ROOT: /usr/share/dotnet
           AZURE_BLOB_SAS_URL: ${{ secrets.AZURE_BLOB_SAS_URL }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
-          sudo apt-get update && sudo apt-get install -y jq
-
+          jq '.' sonar-report.json > sonar-report-pretty.json
           TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-          FOLDER_DATE=$(date +%Y%m%d)
-
+          FILENAME="sonar-report-${TIMESTAMP}.json"
           SAS_URL="${AZURE_BLOB_SAS_URL}"
           BASE_URL=$(echo "$SAS_URL" | cut -d'?' -f1)
           SAS_TOKEN=$(echo "$SAS_URL" | cut -d'?' -f2-)
+          FULL_URL="${BASE_URL}/${FILENAME}?${SAS_TOKEN}"
+          curl -s -S -f -X PUT "$FULL_URL" -H "x-ms-blob-type: BlockBlob" --data-binary @sonar-report-pretty.json
+          
+          FOLDER_DATE=$(date +%Y%m%d)
+          mkdir -p "report/${FOLDER_DATE}"                  
+          cp sonar-report-pretty.json "report/${FOLDER_DATE}/${FILENAME}"
+          echo "SonarQube report saved to report/${FOLDER_DATE}/${FILENAME}"
 
-          # Create beautified version of sonar-report.json
-          BEAUTIFIED="sonar-report-${TIMESTAMP}.json"
-          jq '.' sonar-report.json > "$BEAUTIFIED"
+      - name: Minify SonarQube JSON Report
+        run: |
+          # Create stripped version of sonar-report-pretty.json
+          jq 'del(.issues[].effort, 
+                  .issues[].severity, 
+                  .issues[].type, 
+                  .issues[].component, 
+                  .issues[].project, 
+                  .issues[].organization,
+                  .issues[].author,
+                  .issues[].creationDate,
+                  .issues[].updateDate,
+                  .issues[].tags,
+                  .issues[].isNew)' sonar-report-pretty.json > sonar-report-minified.json
 
-          # Create reduced version for GPT
-          REDUCED="reduced-sonar-report-${TIMESTAMP}.json"
-          jq '{issues: [.issues[] | {file: .component, message: .message, severity: .severity, rule: .rule}]}' "$BEAUTIFIED" > "$REDUCED"
+          echo "Stripped JSON created as sonar-report-minified.json"
 
-          # Upload both files to Azure Blob
-          for FILE in "$BEAUTIFIED" "$REDUCED"; do
-            curl -s -S -f -X PUT "${BASE_URL}/${FILE}?${SAS_TOKEN}" \
-              -H "x-ms-blob-type: BlockBlob" \
-              -H "x-ms-version: 2021-10-04" \
-              --data-binary @"$FILE"
-          done
-
-          mkdir -p "report/${FOLDER_DATE}"
-          cp "$BEAUTIFIED" "report/${FOLDER_DATE}/"
-          cp "$REDUCED" "report/${FOLDER_DATE}/"
-          echo "Reports saved to report/${FOLDER_DATE}/"
-
-      - name: Summarize SonarQube Issues via GPT-4 on Azure Function
+      - name: Upload Minified SonarQube Report to Azure Blob
         env:
           AZURE_BLOB_SAS_URL: ${{ secrets.AZURE_BLOB_SAS_URL }}
-          AZURE_BLOB_SAS_TOKEN: ${{ secrets.AZURE_BLOB_SAS_TOKEN }}
-          AZURE_FUNCTION_URL: ${{ secrets.AZURE_FUNCTION_URL }}
-          AZURE_FUNCTION_KEY: ${{ secrets.AZURE_FUNCTION_KEY }}
         run: |
           TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-          REDUCED="reduced-sonar-report-${TIMESTAMP}.json"
+          FILENAME="sonar-report-minified-${TIMESTAMP}.json"
+          SAS_URL="${AZURE_BLOB_SAS_URL}"
+          BASE_URL=$(echo "$SAS_URL" | cut -d'?' -f1)
+          SAS_TOKEN=$(echo "$SAS_URL" | cut -d'?' -f2-)
+          FULL_URL="${BASE_URL}/${FILENAME}?${SAS_TOKEN}"
+          curl -s -S -f -X PUT "$FULL_URL" -H "x-ms-blob-type: BlockBlob" --data-binary @sonar-report-minified.json
           
-          # Download reduced report from blob
-          curl -o "$REDUCED" "${AZURE_BLOB_SAS_URL}/${REDUCED}"
-
-          # Call Azure Function
-          echo "Downloaded JSON content:"
-          cat "$REDUCED"
-          jq empty "$REDUCED" || (echo "❌ Invalid JSON format!" && exit 1)
-
-          curl -s -X POST "$AZURE_FUNCTION_URL" \
-            -H "Content-Type: application/json" \
-            -H "x-functions-key: $AZURE_FUNCTION_KEY" \
-            --data-binary "@$REDUCED"
-
-          echo "$RESPONSE" > gpt-summary-${TIMESTAMP}.md
-
-          # Upload the summary back to Azure Blob (optional)
-          curl -s -S -f -X PUT "${AZURE_BLOB_SAS_URL}/gpt-summary-${TIMESTAMP}.md?${AZURE_BLOB_SAS_TOKEN}" \
-            -H "x-ms-blob-type: BlockBlob" \
-            -H "x-ms-version: 2021-10-04" \
-            --data-binary "@gpt-summary-${TIMESTAMP}.md"
-
-
-    
+          FOLDER_DATE=$(date +%Y%m%d)
+          mkdir -p "report/${FOLDER_DATE}"                  
+          cp sonar-report-minified.json "report/${FOLDER_DATE}/${FILENAME}"
+          echo "Minified SonarQube report saved to report/${FOLDER_DATE}/${FILENAME}"

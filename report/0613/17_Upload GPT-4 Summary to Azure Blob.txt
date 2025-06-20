@@ -1,0 +1,29 @@
+﻿2025-06-13T08:43:23.5700650Z ##[group]Run if [ ! -f gpt4-summary.md ]; then
+2025-06-13T08:43:23.5701014Z [36;1mif [ ! -f gpt4-summary.md ]; then[0m
+2025-06-13T08:43:23.5701616Z [36;1m  echo "ERROR: gpt4-summary.md not found. Creating a minimal file."[0m
+2025-06-13T08:43:23.5702054Z [36;1m  echo "# GPT-4 Analysis Could Not Be Generated" > gpt4-summary.md[0m
+2025-06-13T08:43:23.5702383Z [36;1m  echo "" >> gpt4-summary.md[0m
+2025-06-13T08:43:23.5702852Z [36;1m  echo "The GPT-4 analysis step encountered an error. Please check the workflow logs for details." >> gpt4-summary.md[0m
+2025-06-13T08:43:23.5703304Z [36;1mfi[0m
+2025-06-13T08:43:23.5703472Z [36;1m[0m
+2025-06-13T08:43:23.5703716Z [36;1mecho "Uploading GPT-4 summary to Azure Blob Storage..."[0m
+2025-06-13T08:43:23.5704143Z [36;1mecho "File exists check: $(ls -la gpt4-summary.md || echo 'File not found')"[0m
+2025-06-13T08:43:23.5704585Z [36;1mecho "File size: $(wc -c gpt4-summary.md || echo 'Cannot check size')"[0m
+2025-06-13T08:43:23.5704906Z [36;1m[0m
+2025-06-13T08:43:23.5705129Z [36;1mTIMESTAMP=$(date +%Y%m%d-%H%M%S)[0m
+2025-06-13T08:43:23.5705406Z [36;1mFILENAME="gpt4-summary-${TIMESTAMP}.md"[0m
+2025-06-13T08:43:23.5705686Z [36;1mSAS_URL="${AZURE_BLOB_SAS_URL}"[0m
+2025-06-13T08:43:23.5705970Z [36;1mBASE_URL=$(echo "$SAS_URL" | cut -d'?' -f1)[0m
+2025-06-13T08:43:23.5706273Z [36;1mSAS_TOKEN=$(echo "$SAS_URL" | cut -d'?' -f2-)[0m
+2025-06-13T08:43:23.5706580Z [36;1mFULL_URL="${BASE_URL}/${FILENAME}?${SAS_TOKEN}"[0m
+2025-06-13T08:43:23.5707008Z [36;1mcurl -s -S -f -X PUT "$FULL_URL" -H "x-ms-blob-type: BlockBlob" --data-binary @gpt4-summary.md[0m
+2025-06-13T08:43:23.5707462Z [36;1mecho "Uploaded GPT-4 summary to Azure Blob: $FILENAME"[0m
+2025-06-13T08:43:23.5764532Z shell: /usr/bin/bash -e {0}
+2025-06-13T08:43:23.5764753Z env:
+2025-06-13T08:43:23.5764934Z   DOTNET_ROOT: /usr/share/dotnet
+2025-06-13T08:43:23.5765787Z   AZURE_BLOB_SAS_URL: ***
+2025-06-13T08:43:23.5765998Z ##[endgroup]
+2025-06-13T08:43:23.5837709Z Uploading GPT-4 summary to Azure Blob Storage...
+2025-06-13T08:43:23.5856281Z File exists check: -rw-r--r-- 1 runner docker 90 Jun 13 08:43 gpt4-summary.md
+2025-06-13T08:43:23.5874662Z File size: 90 gpt4-summary.md
+2025-06-13T08:43:23.6860456Z Uploaded GPT-4 summary to Azure Blob: gpt4-summary-20250613-084323.md

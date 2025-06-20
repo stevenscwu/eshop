@@ -1,0 +1,67 @@
+﻿2025-06-14T08:51:23.8821709Z ##[group]Run MINIFIED_FILE=$(cat minified_filename.txt)
+2025-06-14T08:51:23.8822146Z [36;1mMINIFIED_FILE=$(cat minified_filename.txt)[0m
+2025-06-14T08:51:23.8822471Z [36;1mecho "Using minified file: $MINIFIED_FILE"[0m
+2025-06-14T08:51:23.8822740Z [36;1m[0m
+2025-06-14T08:51:23.8822940Z [36;1m# Check if Azure Function URL is set[0m
+2025-06-14T08:51:23.8823233Z [36;1mif [ -z "$AZURE_FUNCTION_URL" ]; then[0m
+2025-06-14T08:51:23.8823648Z [36;1m  echo "ERROR: AZURE_FUNCTION_URL is not set. Cannot proceed with GPT-4 analysis."[0m
+2025-06-14T08:51:23.8824172Z [36;1m  echo "# GPT-4 Analysis Error: Missing Azure Function URL" > gpt4-summary.md[0m
+2025-06-14T08:51:23.8824536Z [36;1m  exit 0[0m
+2025-06-14T08:51:23.8824717Z [36;1mfi[0m
+2025-06-14T08:51:23.8824884Z [36;1m[0m
+2025-06-14T08:51:23.8825072Z [36;1m# Validate the minified file exists[0m
+2025-06-14T08:51:23.8825366Z [36;1mif [ ! -f "$MINIFIED_FILE" ]; then[0m
+2025-06-14T08:51:23.8825687Z [36;1m  echo "ERROR: Minified file $MINIFIED_FILE not found"[0m
+2025-06-14T08:51:23.8826140Z [36;1m  echo "# GPT-4 Analysis Error: Minified report not found" > gpt4-summary.md[0m
+2025-06-14T08:51:23.8826508Z [36;1m  exit 0[0m
+2025-06-14T08:51:23.8826680Z [36;1mfi[0m
+2025-06-14T08:51:23.8826844Z [36;1m[0m
+2025-06-14T08:51:23.8827060Z [36;1m# Create the input JSON for the Azure Function[0m
+2025-06-14T08:51:23.8827662Z [36;1mecho "Creating input JSON with prompt and report..."[0m
+2025-06-14T08:51:23.8828104Z [36;1mjq -n --slurpfile report "$MINIFIED_FILE" --rawfile prompt prompt.txt \[0m
+2025-06-14T08:51:23.8828549Z [36;1m  '{prompt: $prompt, issues: $report[0].issues}' > input.json[0m
+2025-06-14T08:51:23.8828862Z [36;1m[0m
+2025-06-14T08:51:23.8829025Z [36;1m[0m
+2025-06-14T08:51:23.8829234Z [36;1m# Verify input.json was created and is valid[0m
+2025-06-14T08:51:23.8829600Z [36;1mif [ ! -s input.json ] || ! jq empty input.json > /dev/null 2>&1; then[0m
+2025-06-14T08:51:23.8829985Z [36;1m  echo "ERROR: Failed to create valid input.json"[0m
+2025-06-14T08:51:23.8830437Z [36;1m  echo "# GPT-4 Analysis Error: Failed to create request payload" > gpt4-summary.md[0m
+2025-06-14T08:51:23.8830816Z [36;1m  exit 0[0m
+2025-06-14T08:51:23.8830995Z [36;1mfi[0m
+2025-06-14T08:51:23.8831162Z [36;1m[0m
+2025-06-14T08:51:23.8831391Z [36;1m# Call the Azure Function with proper error handling[0m
+2025-06-14T08:51:23.8831739Z [36;1mecho "Calling Azure Function for analysis..."[0m
+2025-06-14T08:51:23.8832139Z [36;1mHTTP_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$AZURE_FUNCTION_URL" \[0m
+2025-06-14T08:51:23.8832608Z [36;1m  -H "Content-Type: application/json" \[0m
+2025-06-14T08:51:23.8832945Z [36;1m  -H "Accept: text/markdown" \[0m
+2025-06-14T08:51:23.8833205Z [36;1m  --max-time 180 \[0m
+2025-06-14T08:51:23.8833444Z [36;1m  --data-binary @input.json)[0m
+2025-06-14T08:51:23.8833848Z [36;1m[0m
+2025-06-14T08:51:23.8834027Z [36;1m# Extract status code and body[0m
+2025-06-14T08:51:23.8834318Z [36;1mHTTP_BODY=$(echo "$HTTP_RESPONSE" | sed '$d')[0m
+2025-06-14T08:51:23.8834653Z [36;1mHTTP_STATUS=$(echo "$HTTP_RESPONSE" | tail -n1)[0m
+2025-06-14T08:51:23.8834929Z [36;1m[0m
+2025-06-14T08:51:23.8835120Z [36;1mif [ "$HTTP_STATUS" -eq 200 ]; then[0m
+2025-06-14T08:51:23.8835403Z [36;1m  echo "$HTTP_BODY" > gpt4-summary.md[0m
+2025-06-14T08:51:23.8835729Z [36;1m  echo "✅ GPT-4 summary written to gpt4-summary.md"[0m
+2025-06-14T08:51:23.8836046Z [36;1m  ls -la gpt4-summary.md[0m
+2025-06-14T08:51:23.8836277Z [36;1melse[0m
+2025-06-14T08:51:23.8836558Z [36;1m  echo "❌ Error calling Azure Function: HTTP status $HTTP_STATUS"[0m
+2025-06-14T08:51:23.8836953Z [36;1m  echo "# GPT-4 Analysis Error" > gpt4-summary.md[0m
+2025-06-14T08:51:23.8837243Z [36;1m  echo "" >> gpt4-summary.md[0m
+2025-06-14T08:51:23.8838059Z [36;1m  echo "The analysis failed with HTTP status code $HTTP_STATUS" >> gpt4-summary.md[0m
+2025-06-14T08:51:23.8838488Z [36;1m  echo "" >> gpt4-summary.md[0m
+2025-06-14T08:51:23.8838753Z [36;1m  echo "Response:" >> gpt4-summary.md[0m
+2025-06-14T08:51:23.8839221Z [36;1m  echo '```' >> gpt4-summary.md[0m
+2025-06-14T08:51:23.8839491Z [36;1m  echo "$HTTP_BODY" >> gpt4-summary.md[0m
+2025-06-14T08:51:23.8839762Z [36;1m  echo '```' >> gpt4-summary.md[0m
+2025-06-14T08:51:23.8839995Z [36;1mfi[0m
+2025-06-14T08:51:23.8890898Z shell: /usr/bin/bash -e {0}
+2025-06-14T08:51:23.8891138Z env:
+2025-06-14T08:51:23.8891321Z   DOTNET_ROOT: /usr/share/dotnet
+2025-06-14T08:51:23.8892120Z   AZURE_FUNCTION_URL: ***
+2025-06-14T08:51:23.8892348Z ##[endgroup]
+2025-06-14T08:51:23.8973857Z Using minified file: sonar-report-minified-20250614-085123.json
+2025-06-14T08:51:23.8974343Z Creating input JSON with prompt and report...
+2025-06-14T08:51:23.9041137Z Calling Azure Function for analysis...
+2025-06-14T08:51:27.2456409Z ❌ Error calling Azure Function: HTTP status 500
