@@ -125,6 +125,15 @@ jobs:
           cp "$REDUCED" "report/${FOLDER_DATE}/"
           echo "Reports saved to report/${FOLDER_DATE}/"
 
+      - name: 📄 Validate JSON (remove BOM if exists)
+        run: |
+          echo "🧹 Stripping BOM (if present)..."
+          sed '1s/^\xEF\xBB\xBF//' "$REDUCED" > temp.json && mv temp.json "$REDUCED"
+          
+          echo "🔍 Validating JSON with jq..."
+          jq empty "$REDUCED" || (echo "❌ Invalid JSON format!" && exit 1)
+
+          
       - name: Summarize SonarQube Issues via GPT-4 on Azure Function
         env:
           AZURE_BLOB_SAS_URL: ${{ secrets.AZURE_BLOB_SAS_URL }}
