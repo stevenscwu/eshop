@@ -97,7 +97,7 @@ jobs:
         run: |
           sudo apt-get update && sudo apt-get install -y jq
 
-          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          TIMESTAMP=$(date +%Y%m%d)
           FOLDER_DATE=$(date +%Y%m%d)
 
           SAS_URL="${AZURE_BLOB_SAS_URL}"
