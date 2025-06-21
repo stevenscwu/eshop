@@ -125,15 +125,21 @@ jobs:
           cp "$REDUCED" "report/${FOLDER_DATE}/"
           echo "Reports saved to report/${FOLDER_DATE}/"
 
-      - name: 📄 Validate JSON (remove BOM if exists)
+      - name: Validate and Sanitize JSON
         run: |
-          echo "🧹 Stripping BOM (if present)..."
-          REDUCED="reduced-sonar-report-$(date +%Y%m%d).json"
-          sed '1s/^\xEF\xBB\xBF//' "$REDUCED" > temp.json && mv temp.json "$REDUCED"
-          
-          echo "🔍 Validating JSON with jq..."
-          jq empty "$REDUCED" || (echo "❌ Invalid JSON format!" && exit 1)
+          DATE=$(date +%Y%m%d)
+          REDUCED="reduced-sonar-report-${DATE}.json"
 
+          echo "🔽 Downloading $REDUCED"
+          curl -o "$REDUCED" "${AZURE_BLOB_SAS_URL}/${REDUCED}?${AZURE_BLOB_SAS_TOKEN}"
+
+          echo "🧹 Stripping BOM (if present)..."
+          tail -c +1 "$REDUCED" | sed '1s/^\xEF\xBB\xBF//' > clean.json
+
+          echo "📄 Validating JSON"
+          jq empty clean.json || (echo "❌ Invalid JSON format!" && exit 1)
+
+          mv clean.json "$REDUCED"
 
       - name: Summarize SonarQube Issues via GPT-4 on Azure Function
         env:
