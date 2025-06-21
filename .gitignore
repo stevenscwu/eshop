@@ -33,6 +33,9 @@ MANIFEST
 *.manifest
 *.spec
 
+# Avoid committing reports with sensitive keys
+report/**/*.md
+debug/*.*
 # Installer logs
 pip-log.txt
 pip-delete-this-directory.txt
