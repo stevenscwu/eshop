@@ -126,6 +126,9 @@ jobs:
           echo "Reports saved to report/${FOLDER_DATE}/"
 
       - name: Validate and Sanitize JSON
+        env:
+          AZURE_BLOB_SAS_URL: ${{ secrets.AZURE_BLOB_SAS_URL }}
+          AZURE_BLOB_SAS_TOKEN: ${{ secrets.AZURE_BLOB_SAS_TOKEN }}
         run: |
           DATE=$(date +%Y%m%d)
           REDUCED="reduced-sonar-report-${DATE}.json"
