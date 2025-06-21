@@ -35,6 +35,13 @@ Please:
 @app.route(route="AnalyzeSonarReport", auth_level=func.AuthLevel.FUNCTION)
 def analyze_sonar_report(req: func.HttpRequest) -> func.HttpResponse:
     try:
+        logging.info("🔁 Azure Function triggered")
+
+        if req.method != "POST":
+            return func.HttpResponse(
+                "❌ Please use POST with JSON body containing 'issues'.", status_code=400
+            )
+
         data = req.get_json()
         issues = data.get("issues", [])
         logging.info(f"✅ Total issues received: {len(issues)}")
