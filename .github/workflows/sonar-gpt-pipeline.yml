@@ -175,6 +175,16 @@ jobs:
 
           echo "📤 Sending request to Azure Function at $AZURE_FUNCTION_URL"
 
+          if [[ -z "$AZURE_FUNCTION_URL" ]]; then
+            echo "❌ AZURE_FUNCTION_URL is not set."
+            exit 3
+          fi
+
+          if [[ -z "$AZURE_FUNCTION_KEY" ]]; then
+            echo "❌ AZURE_FUNCTION_KEY is not set."
+            exit 4
+          fi
+
           STATUS_CODE=$(curl -s -o response.txt -w "%{http_code}" -X POST "$AZURE_FUNCTION_URL" \
             -H "Content-Type: application/json" \
             -H "x-functions-key: $AZURE_FUNCTION_KEY" \
