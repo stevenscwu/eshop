@@ -1,0 +1,16 @@
+{
+  "issues": [
+    {
+      "file": "src/checkout.cs",
+      "message": "Hardcoded credentials should not be used.",
+      "severity": "CRITICAL",
+      "rule": "csharpsquid:S2068"
+    },
+    {
+      "file": "src/cart.cs",
+      "message": "Avoid catching generic exceptions.",
+      "severity": "MAJOR",
+      "rule": "csharpsquid:S2221"
+    }
+  ]
+}
