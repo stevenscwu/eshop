@@ -166,26 +166,31 @@ jobs:
           WRAPPED="wrapped-sonar-report-${DATE}.json"
 
           echo "🔁 Wrapping JSON file to expected format..."
+          if [[ ! -f "$REDUCED" ]]; then
+          echo "❌ Reduced report file not found: $REDUCED"
+          exit 1
+          fi
+
           jq '{issues: .}' "$REDUCED" > "$WRAPPED"
 
           echo "📤 Sending request to Azure Function at $AZURE_FUNCTION_URL"
-          echo "📋 Payload preview:"
-          cat "$WRAPPED"
+                                                # echo "📋 Payload preview:"
+                                                # cat "$WRAPPED"
 
-          RESPONSE=$(curl -s -X POST "$AZURE_FUNCTION_URL" \
+          STATUS_CODE=$(curl -s -o response.txt -w "%{http_code}" -X POST "$AZURE_FUNCTION_URL" \
             -H "Content-Type: application/json" \
             -H "x-functions-key: $AZURE_FUNCTION_KEY" \
             --data "@$WRAPPED")
 
-          echo "📨 Azure Function response:"
-          echo "$RESPONSE"
+          echo "📨 Azure Function raw response:"
+          cat response.txt
 
-          if [[ "$RESPONSE" == *"❌"* || "$RESPONSE" == *"error"* || "$RESPONSE" == *"Internal server error"* ]]; then
-            echo "❌ Azure Function or GPT-4 processing failed."
+          if [[ "$STATUS_CODE" -ne 200 ]]; then
+            echo "❌ Azure Function returned HTTP $STATUS_CODE"
             exit 1
           fi
 
-          echo "$RESPONSE" > gpt-summary-${DATE}.md
+          mv response.txt gpt-summary-${DATE}.md
 
           echo "☁️ Uploading to Azure Blob..."
           curl -s -S -f -X PUT "${AZURE_BLOB_SAS_URL}/gpt-summary-${DATE}.md?${AZURE_BLOB_SAS_TOKEN}" \
