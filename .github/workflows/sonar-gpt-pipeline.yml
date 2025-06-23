@@ -166,11 +166,22 @@ jobs:
           jq empty "$REDUCED" || (echo "❌ Invalid JSON format!" && exit 1)
 
           echo "📡 Calling Azure Function..."
+          # Derive timestamped filename
+          DATE=$(date +%Y%m%d)
+          INPUT_FILE="wrapped-sonar-report-$DATE.json"
+
+          # Wrap the JSON to ensure {"issues": [...]}
+          jq '{issues: .issues}' "$REDUCED" > "$INPUT_FILE"
+
+          # Send to Azure Function
           RESPONSE=$(curl -s -X POST "$AZURE_FUNCTION_URL" \
             -H "Content-Type: application/json" \
             -H "x-functions-key: $AZURE_FUNCTION_KEY" \
-            --data-binary "@$REDUCED")
+            --data-binary "@$INPUT_FILE")
 
+          echo "📨 Azure Function response:"
+          echo "$RESPONSE"
+          
           echo "$RESPONSE" > gpt-summary-${DATE}.md
           echo "✅ Saved GPT-4 summary to gpt-summary-${DATE}.md"
 
