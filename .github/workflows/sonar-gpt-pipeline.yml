@@ -157,45 +157,35 @@ jobs:
           AZURE_FUNCTION_URL: ${{ secrets.AZURE_FUNCTION_URL }}
           AZURE_FUNCTION_KEY: ${{ secrets.AZURE_FUNCTION_KEY }}
         run: |
+      - name: 13_Summarize SonarQube Issues via GPT-4 on Azure Function
+        run: |
+          set -e  # fail on error
+
           DATE=$(date +%Y%m%d)
           REDUCED="reduced-sonar-report-${DATE}.json"
-          echo "🔽 Downloading $REDUCED"
-          curl -o "$REDUCED" "${AZURE_BLOB_SAS_URL}/${REDUCED}?${AZURE_BLOB_SAS_TOKEN}"
+          WRAPPED="wrapped-sonar-report-${DATE}.json"
 
-          echo "📄 Validating JSON"
-          jq empty "$REDUCED" || (echo "❌ Invalid JSON format!" && exit 1)
+          echo "🔁 Wrapping JSON file to expected format..."
+          jq '{issues: .}' "$REDUCED" > "$WRAPPED"
 
-          echo "📡 Calling Azure Function..."
-          # Derive timestamped filename
-          DATE=$(date +%Y%m%d)
-          INPUT_FILE="wrapped-sonar-report-$DATE.json"
-
-          # Wrap the JSON to ensure {"issues": [...]}
-          jq '{issues: .issues}' "$REDUCED" > "$INPUT_FILE"
-
-          echo "📤 Sending wrapped JSON to Azure Function: $AZURE_FUNCTION_URL"
+          echo "📤 Sending request to Azure Function at $AZURE_FUNCTION_URL"
           echo "📋 Payload preview:"
-          cat "$INPUT_FILE"
+          cat "$WRAPPED"
 
-          # Send to Azure Function
           RESPONSE=$(curl -s -X POST "$AZURE_FUNCTION_URL" \
             -H "Content-Type: application/json" \
             -H "x-functions-key: $AZURE_FUNCTION_KEY" \
-            --data-binary "@$INPUT_FILE")
+            --data "@$WRAPPED")
 
           echo "📨 Azure Function response:"
           echo "$RESPONSE"
 
-          # Optional fail-fast if function doesn't return meaningful content
           if [[ "$RESPONSE" == *"❌"* || "$RESPONSE" == *"error"* || "$RESPONSE" == *"Internal server error"* ]]; then
             echo "❌ Azure Function or GPT-4 processing failed."
             exit 1
           fi
 
           echo "$RESPONSE" > gpt-summary-${DATE}.md
-          
-          echo "$RESPONSE" > gpt-summary-${DATE}.md
-          echo "✅ Saved GPT-4 summary to gpt-summary-${DATE}.md"
 
           echo "☁️ Uploading to Azure Blob..."
           curl -s -S -f -X PUT "${AZURE_BLOB_SAS_URL}/gpt-summary-${DATE}.md?${AZURE_BLOB_SAS_TOKEN}" \
