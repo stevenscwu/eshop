@@ -189,12 +189,13 @@ jobs:
             exit 4
           fi
 
-          STATUS_CODE=$(curl -s -o response.txt -w "%{http_code}" -X POST "$AZURE_FUNCTION_URL" \
+          STATUS_CODE=$(curl -s -o response.txt -w "%{http_code}" -X POST "$AZURE_FUNCTION_URL/api/AnalyzeSonarReport" \
             -H "Content-Type: application/json" \
             -H "x-functions-key: $AZURE_FUNCTION_KEY" \
             --data "@$WRAPPED")
 
-          echo "📨 Azure Function raw response:"
+          echo "📨 Azure Function response status: $STATUS_CODE"
+          echo "📄 Azure Function output:"
           cat response.txt
 
           if [[ "$STATUS_CODE" -ne 200 ]]; then
