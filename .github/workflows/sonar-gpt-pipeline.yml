@@ -174,8 +174,6 @@ jobs:
           jq '{issues: .}' "$REDUCED" > "$WRAPPED"
 
           echo "📤 Sending request to Azure Function at $AZURE_FUNCTION_URL"
-                                                # echo "📋 Payload preview:"
-                                                # cat "$WRAPPED"
 
           STATUS_CODE=$(curl -s -o response.txt -w "%{http_code}" -X POST "$AZURE_FUNCTION_URL" \
             -H "Content-Type: application/json" \
