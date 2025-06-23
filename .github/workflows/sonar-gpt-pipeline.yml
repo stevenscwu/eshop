@@ -173,6 +173,10 @@ jobs:
           # Wrap the JSON to ensure {"issues": [...]}
           jq '{issues: .issues}' "$REDUCED" > "$INPUT_FILE"
 
+          echo "📤 Sending wrapped JSON to Azure Function: $AZURE_FUNCTION_URL"
+          echo "📋 Payload preview:"
+          cat "$INPUT_FILE"
+
           # Send to Azure Function
           RESPONSE=$(curl -s -X POST "$AZURE_FUNCTION_URL" \
             -H "Content-Type: application/json" \
@@ -181,6 +185,14 @@ jobs:
 
           echo "📨 Azure Function response:"
           echo "$RESPONSE"
+
+          # Optional fail-fast if function doesn't return meaningful content
+          if [[ "$RESPONSE" == *"❌"* || "$RESPONSE" == *"error"* || "$RESPONSE" == *"Internal server error"* ]]; then
+            echo "❌ Azure Function or GPT-4 processing failed."
+            exit 1
+          fi
+
+          echo "$RESPONSE" > gpt-summary-${DATE}.md
           
           echo "$RESPONSE" > gpt-summary-${DATE}.md
           echo "✅ Saved GPT-4 summary to gpt-summary-${DATE}.md"
