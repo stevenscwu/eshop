@@ -150,5 +150,66 @@ jobs:
 
           mv clean.json "$REDUCED"
 
+      - name: Summarize SonarQube Issues via GPT-4 on Azure Function
+        env:
+          AZURE_BLOB_SAS_URL: ${{ secrets.AZURE_BLOB_SAS_URL }}
+          AZURE_BLOB_SAS_TOKEN: ${{ secrets.AZURE_BLOB_SAS_TOKEN }}
+          AZURE_FUNCTION_URL: ${{ secrets.AZURE_FUNCTION_URL }}
+          AZURE_FUNCTION_KEY: ${{ secrets.AZURE_FUNCTION_KEY }}
+        run: |
+      - name: 13_Summarize SonarQube Issues via GPT-4 on Azure Function
+        env:
+          AZURE_FUNCTION_URL: ${{ secrets.AZURE_FUNCTION_URL }}
+          AZURE_FUNCTION_KEY: ${{ secrets.AZURE_FUNCTION_KEY }}
+
+        run: |
+          set -e  # fail on error
+
+          DATE=$(date +%Y%m%d)
+          REDUCED="reduced-sonar-report-${DATE}.json"
+          WRAPPED="wrapped-sonar-report-${DATE}.json"
+
+          echo "🔁 Wrapping JSON file to expected format..."
+          if [[ ! -f "$REDUCED" ]]; then
+          echo "❌ Reduced report file not found: $REDUCED"
+          exit 1
+          fi
+
+          jq '{issues: .}' "$REDUCED" > "$WRAPPED"
+
+          echo "📤 Sending request to Azure Function at $AZURE_FUNCTION_URL"
+
+          if [[ -z "$AZURE_FUNCTION_URL" ]]; then
+            echo "❌ AZURE_FUNCTION_URL is not set."
+            exit 3
+          fi
+
+          if [[ -z "$AZURE_FUNCTION_KEY" ]]; then
+            echo "❌ AZURE_FUNCTION_KEY is not set."
+            exit 4
+          fi
+
+          STATUS_CODE=$(curl -s -o response.txt -w "%{http_code}" -X POST "$AZURE_FUNCTION_URL/api/AnalyzeSonarReport" \
+            -H "Content-Type: application/json" \
+            -H "x-functions-key: $AZURE_FUNCTION_KEY" \
+            --data "@$WRAPPED")
+
+          echo "📨 Azure Function response status: $STATUS_CODE"
+          echo "📄 Azure Function output:"
+          cat response.txt
+
+          if [[ "$STATUS_CODE" -ne 200 ]]; then
+            echo "❌ Azure Function returned HTTP $STATUS_CODE"
+            exit 1
+          fi
+
+          mv response.txt gpt-summary-${DATE}.md
+
+          echo "☁️ Uploading to Azure Blob..."
+          curl -s -S -f -X PUT "${AZURE_BLOB_SAS_URL}/gpt-summary-${DATE}.md?${AZURE_BLOB_SAS_TOKEN}" \
+            -H "x-ms-blob-type: BlockBlob" \
+            -H "x-ms-version: 2021-10-04" \
+            --data-binary "@gpt-summary-${DATE}.md"
+
 
     

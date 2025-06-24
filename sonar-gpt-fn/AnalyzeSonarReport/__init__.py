@@ -2,7 +2,12 @@ import logging
 import openai
 import json
 import azure.functions as func
+from azure.functions import HttpRequest, HttpResponse
+from azure.functions import App
+from function_app import app
 import os
+
+app = App()
 
 # Trigger redeploy from GitHub Actions
 
@@ -32,7 +37,7 @@ Please:
 """
 
 @app.function_name(name="AnalyzeSonarReport")
-@app.route(route="AnalyzeSonarReport", auth_level=func.AuthLevel.FUNCTION)
+@app.route(route="AnalyzeSonarReport", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
 def analyze_sonar_report(req: func.HttpRequest) -> func.HttpResponse:
     try:
         logging.info("🔁 Azure Function triggered")
