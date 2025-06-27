@@ -1,0 +1,952 @@
+{
+  "issues": [
+    {
+      "file": "eshop:YAML/record/init/reducedSonar__init__.py",
+      "message": "Remove the unused local variable \"e\".",
+      "severity": "MINOR",
+      "rule": "python:S1481"
+    },
+    {
+      "file": "eshop:function_app.py",
+      "message": "Rename function \"AnalyzeSonarReport\" to match the regular expression ^[a-z_][a-z0-9_]*$.",
+      "severity": "MAJOR",
+      "rule": "python:S1542"
+    },
+    {
+      "file": "eshop:sonar-gpt-fn/AnalyzeSonarReport/__init__.py",
+      "message": "Remove the unused local variable \"e\".",
+      "severity": "MINOR",
+      "rule": "python:S1481"
+    },
+    {
+      "file": "eshop:sonar-gpt-fn/function_app.py",
+      "message": "Rename function \"AnalyzeSonarReport\" to match the regular expression ^[a-z_][a-z0-9_]*$.",
+      "severity": "MAJOR",
+      "rule": "python:S1542"
+    },
+    {
+      "file": "eshop:azure-function/AnalyzeSonarReport/__init__.py",
+      "message": "Remove the unused local variable \"e\".",
+      "severity": "MINOR",
+      "rule": "python:S1481"
+    },
+    {
+      "file": "eshop:src/Web/wwwroot/css/_variables.css",
+      "message": "Unexpected empty source",
+      "severity": "MAJOR",
+      "rule": "css:S4667"
+    },
+    {
+      "file": "eshop:src/ApplicationCore/Constants/AuthorizationConstants.cs",
+      "message": "Add a 'protected' constructor or the 'static' keyword to the class declaration.",
+      "severity": "MAJOR",
+      "rule": "csharpsquid:S1118"
+    },
+    {
+      "file": "eshop:src/ApplicationCore/Constants/AuthorizationConstants.cs",
+      "message": "Complete the task associated to this 'TODO' comment.",
+      "severity": "INFO",
+      "rule": "csharpsquid:S1135"
+    },
+    {
+      "file": "eshop:src/ApplicationCore/Constants/AuthorizationConstants.cs",
+      "message": "Complete the task associated to this 'TODO' comment.",
+      "severity": "INFO",
+      "rule": "csharpsquid:S1135"
+    },
+    {
+      "file": "eshop:src/ApplicationCore/Entities/BuyerAggregate/Buyer.cs",
+      "message": "Make '_paymentMethods' 'readonly'.",
+      "severity": "MAJOR",
+      "rule": "csharpsquid:S2933"
+    },
+    {
+      "file": "eshop:src/ApplicationCore/Entities/BuyerAggregate/Buyer.cs",
+      "message": "Remove this argument from the method call; it hides the caller information.",
+      "severity": "MINOR",
+      "rule": "csharpsquid:S3236"
+    },
+    {
+      "file": "eshop:src/ApplicationCore/Entities/CatalogItem.cs",
+      "message": "Remove this argument from the method call; it hides the caller information.",
+      "severity": "MINOR",
+      "rule": "csharpsquid:S3236"
+    },
+    {
+      "file": "eshop:src/ApplicationCore/Entities/CatalogItem.cs",
+      "message": "Remove this argument from the method call; it hides the caller information.",
+      "severity": "MINOR",
+      "rule": "csharpsquid:S3236"
+    },
+    {
+      "file": "eshop:src/ApplicationCore/Entities/CatalogItem.cs",
+      "message": "Remove this argument from the method call; it hides the caller information.",
+      "severity": "MINOR",
+      "rule": "csharpsquid:S3236"
+    },
+    {
+      "file": "eshop:src/ApplicationCore/Entities/CatalogItem.cs",
+      "message": "Remove this argument from the method call; it hides the caller information.",
+      "severity": "MINOR",
+      "rule": "csharpsquid:S3236"
+    },
+    {
+      "file": "eshop:src/ApplicationCore/Entities/CatalogItem.cs",
+      "message": "Remove this argument from the method call; it hides the caller information.",
+      "severity": "MINOR",
+      "rule": "csharpsquid:S3236"
+    },
+    {
+      "file": "eshop:src/ApplicationCore/Entities/CatalogItem.cs",
+      "message": "Provide the \"DateTimeKind\" when creating this object.",
+      "severity": "MAJOR",
+      "rule": "csharpsquid:S6562"
+    },
+    {
+      "file": "eshop:src/ApplicationCore/Entities/OrderAggregate/CatalogItemOrdered.cs",
+      "message": "Remove this argument from the method call; it hides the caller information.",
+      "severity": "MINOR",
+      "rule": "csharpsquid:S3236"
+    },
+    {
+      "file": "eshop:src/ApplicationCore/Entities/OrderAggregate/CatalogItemOrdered.cs",
+      "message": "Remove this argument from the method call; it hides the caller information.",
+      "severity": "MINOR",
+      "rule": "csharpsquid:S3236"
+    },
+    {
+      "file": "eshop:src/ApplicationCore/Entities/OrderAggregate/Order.cs",
+      "message": "Remove this argument from the method call; it hides the caller information.",
+      "severity": "MINOR",
+      "rule": "csharpsquid:S3236"
+    },
+    {
+      "file": "eshop:src/ApplicationCore/Exceptions/EmptyBasketOnCheckoutException.cs",
+      "message": "Update this implementation of 'ISerializable' to conform to the recommended serialization pattern. Add 'System.SerializableAttribute' attribute on 'EmptyBasketOnCheckoutException' because it implements 'ISerializable'.",
+      "severity": "MAJOR",
+      "rule": "csharpsquid:S3925"
+    },
+    {
+      "file": "eshop:src/ApplicationCore/Exceptions/EmptyBasketOnCheckoutException.cs",
+      "message": "'Exception.Exception(SerializationInfo, StreamingContext)' is obsolete: 'This API supports obsolete formatter-based serialization. It should not be called or extended by application code.'",
+      "severity": "MAJOR",
+      "rule": "external_roslyn:SYSLIB0051"
+    },
+    {
+      "file": "eshop:src/ApplicationCore/Extensions/GuardExtensions.cs",
+      "message": "Prefer comparing 'Count' to 0 rather than using 'Any()', both for clarity and for performance",
+      "severity": "INFO",
+      "rule": "external_roslyn:CA1860"
+    },
+    {
+      "file": "eshop:src/ApplicationCore/Interfaces/IAppLogger.cs",
+      "message": "'T' is not used in the interface.",
+      "severity": "MAJOR",
+      "rule": "csharpsquid:S2326"
+    },
+    {
+      "file": "eshop:src/ApplicationCore/Services/BasketService.cs",
+      "message": "Remove this argument from the method call; it hides the caller information.",
+      "severity": "MINOR",
+      "rule": "csharpsquid:S3236"
+    },
+    {
+      "file": "eshop:src/ApplicationCore/Services/OrderService.cs",
+      "message": "Remove this argument from the method call; it hides the caller information.",
+      "severity": "MINOR",
+      "rule": "csharpsquid:S3236"
+    },
+    {
+      "file": "eshop:src/BlazorShared/Attributes/EndpointAttribute.cs",
+      "message": "Specify AttributeUsage on EndpointAttribute",
+      "severity": "INFO",
+      "rule": "external_roslyn:CA1018"
+    },
+    {
+      "file": "eshop:src/Infrastructure/Data/CatalogContext.cs",
+      "message": "Rename parameter 'builder' to 'modelBuilder' to match the base class declaration.",
+      "severity": "CRITICAL",
+      "rule": "csharpsquid:S927"
+    },
+    {
+      "file": "eshop:src/Infrastructure/Data/CatalogContextSeed.cs",
+      "message": "Add a 'protected' constructor or the 'static' keyword to the class declaration.",
+      "severity": "MAJOR",
+      "rule": "csharpsquid:S1118"
+    },
+    {
+      "file": "eshop:src/Infrastructure/Data/CatalogContextSeed.cs",
+      "message": "The logging message template should not vary between calls to 'LoggerExtensions.LogError(ILogger, string?, params object?[])'",
+      "severity": "INFO",
+      "rule": "external_roslyn:CA2254"
+    },
+    {
+      "file": "eshop:src/Infrastructure/Data/CatalogContextSeed.cs",
+      "message": "Change return type of method 'GetPreconfiguredCatalogBrands' from 'System.Collections.Generic.IEnumerable<Microsoft.eShopWeb.ApplicationCore.Entities.CatalogBrand>' to 'System.Collections.Generic.List<Microsoft.eShopWeb.ApplicationCore.Entities.CatalogBrand>' for improved performance",
+      "severity": "INFO",
+      "rule": "external_roslyn:CA1859"
+    },
+    {
+      "file": "eshop:src/Infrastructure/Data/CatalogContextSeed.cs",
+      "message": "Change return type of method 'GetPreconfiguredCatalogTypes' from 'System.Collections.Generic.IEnumerable<Microsoft.eShopWeb.ApplicationCore.Entities.CatalogType>' to 'System.Collections.Generic.List<Microsoft.eShopWeb.ApplicationCore.Entities.CatalogType>' for improved performance",
+      "severity": "INFO",
+      "rule": "external_roslyn:CA1859"
+    },
+    {
+      "file": "eshop:src/Infrastructure/Data/CatalogContextSeed.cs",
+      "message": "Change return type of method 'GetPreconfiguredItems' from 'System.Collections.Generic.IEnumerable<Microsoft.eShopWeb.ApplicationCore.Entities.CatalogItem>' to 'System.Collections.Generic.List<Microsoft.eShopWeb.ApplicationCore.Entities.CatalogItem>' for improved performance",
+      "severity": "INFO",
+      "rule": "external_roslyn:CA1859"
+    },
+    {
+      "file": "eshop:src/Infrastructure/Identity/AppIdentityDbContext.cs",
+      "message": "Remove this method 'OnModelCreating' to simply inherit its behavior.",
+      "severity": "MINOR",
+      "rule": "csharpsquid:S1185"
+    },
+    {
+      "file": "eshop:src/Infrastructure/Identity/AppIdentityDbContext.cs",
+      "message": "Remove this commented out code.",
+      "severity": "MAJOR",
+      "rule": "csharpsquid:S125"
+    },
+    {
+      "file": "eshop:src/Infrastructure/Identity/AppIdentityDbContextSeed.cs",
+      "message": "Add a 'protected' constructor or the 'static' keyword to the class declaration.",
+      "severity": "MAJOR",
+      "rule": "csharpsquid:S1118"
+    },
+    {
+      "file": "eshop:src/Infrastructure/Identity/ApplicationUser.cs",
+      "message": "Remove this empty class, write its code or make it an \"interface\".",
+      "severity": "MINOR",
+      "rule": "csharpsquid:S2094"
+    },
+    {
+      "file": "eshop:src/Infrastructure/Logging/LoggerAdapter.cs",
+      "message": "The logging message template should not vary between calls to 'LoggerExtensions.LogWarning(ILogger, string?, params object?[])'",
+      "severity": "INFO",
+      "rule": "external_roslyn:CA2254"
+    },
+    {
+      "file": "eshop:src/Infrastructure/Logging/LoggerAdapter.cs",
+      "message": "The logging message template should not vary between calls to 'LoggerExtensions.LogInformation(ILogger, string?, params object?[])'",
+      "severity": "INFO",
+      "rule": "external_roslyn:CA2254"
+    },
+    {
+      "file": "eshop:src/Infrastructure/Services/EmailSender.cs",
+      "message": "Complete the task associated to this 'TODO' comment.",
+      "severity": "INFO",
+      "rule": "csharpsquid:S1135"
+    },
+    {
+      "file": "eshop:src/PublicApi/AuthEndpoints/AuthenticateEndpoint.cs",
+      "message": "Remove this commented out code.",
+      "severity": "MAJOR",
+      "rule": "csharpsquid:S125"
+    },
+    {
+      "file": "eshop:src/PublicApi/BaseResponse.cs",
+      "message": "Change the visibility of this constructor to 'protected'.",
+      "severity": "MAJOR",
+      "rule": "csharpsquid:S3442"
+    },
+    {
+      "file": "eshop:src/PublicApi/BaseResponse.cs",
+      "message": "Change the visibility of this constructor to 'protected'.",
+      "severity": "MAJOR",
+      "rule": "csharpsquid:S3442"
+    },
+    {
+      "file": "eshop:src/PublicApi/CustomSchemaFilters.cs",
+      "message": "Loops should be simplified using the \"Where\" LINQ method",
+      "severity": "MINOR",
+      "rule": "csharpsquid:S3267"
+    },
+    {
+      "file": "eshop:src/PublicApi/Middleware/ExceptionMiddleware.cs",
+      "message": "Member 'HandleExceptionAsync' does not access instance data and can be marked as static",
+      "severity": "INFO",
+      "rule": "external_roslyn:CA1822"
+    },
+    {
+      "file": "eshop:src/PublicApi/Program.cs",
+      "message": "Add a 'protected' constructor or the 'static' keyword to the class declaration.",
+      "severity": "MAJOR",
+      "rule": "csharpsquid:S1118"
+    },
+    {
+      "file": "eshop:src/Web/Areas/Identity/Pages/Account/Login.cshtml.cs",
+      "message": "Remove this commented out code.",
+      "severity": "MAJOR",
+      "rule": "csharpsquid:S125"
+    },
+    {
+      "file": "eshop:src/Web/Areas/Identity/Pages/Account/Login.cshtml.cs",
+      "message": "Remove this argument from the method call; it hides the caller information.",
+      "severity": "MINOR",
+      "rule": "csharpsquid:S3236"
+    },
+    {
+      "file": "eshop:src/Web/Areas/Identity/Pages/Account/Logout.cshtml.cs",
+      "message": "Complete the task associated to this 'TODO' comment.",
+      "severity": "INFO",
+      "rule": "csharpsquid:S1135"
+    },
+    {
+      "file": "eshop:src/Web/Areas/Identity/Pages/Account/Logout.cshtml.cs",
+      "message": "Add a nested comment explaining why this method is empty, throw a 'NotSupportedException' or complete the implementation.",
+      "severity": "CRITICAL",
+      "rule": "csharpsquid:S1186"
+    },
+    {
+      "file": "eshop:src/Web/Areas/Identity/Pages/Account/Register.cshtml.cs",
+      "message": "Remove this argument from the method call; it hides the caller information.",
+      "severity": "MINOR",
+      "rule": "csharpsquid:S3236"
+    },
+    {
+      "file": "eshop:src/Web/Configuration/ConfigureCookieSettings.cs",
+      "message": "Complete the task associated to this 'TODO' comment.",
+      "severity": "INFO",
+      "rule": "csharpsquid:S1135"
+    },
+    {
+      "file": "eshop:src/Web/Configuration/ConfigureCookieSettings.cs",
+      "message": "Remove this commented out code.",
+      "severity": "MAJOR",
+      "rule": "csharpsquid:S125"
+    },
+    {
+      "file": "eshop:src/Web/Configuration/RevokeAuthenticationEvents.cs",
+      "message": "Complete the task associated to this 'TODO' comment.",
+      "severity": "INFO",
+      "rule": "csharpsquid:S1135"
+    },
+    {
+      "file": "eshop:src/Web/Configuration/RevokeAuthenticationEvents.cs",
+      "message": "The logging message template should not vary between calls to 'LoggerExtensions.LogDebug(ILogger, string?, params object?[])'",
+      "severity": "INFO",
+      "rule": "external_roslyn:CA2254"
+    },
+    {
+      "file": "eshop:src/Web/Controllers/ManageController.cs",
+      "message": "Refactor your code not to use hardcoded absolute paths or URIs.",
+      "severity": "MINOR",
+      "rule": "csharpsquid:S1075"
+    },
+    {
+      "file": "eshop:src/Web/Controllers/ManageController.cs",
+      "message": "'System.ApplicationException' should not be thrown by user code.",
+      "severity": "MAJOR",
+      "rule": "csharpsquid:S112"
+    },
+    {
+      "file": "eshop:src/Web/Controllers/ManageController.cs",
+      "message": "'System.ApplicationException' should not be thrown by user code.",
+      "severity": "MAJOR",
+      "rule": "csharpsquid:S112"
+    },
+    {
+      "file": "eshop:src/Web/Controllers/ManageController.cs",
+      "message": "'System.ApplicationException' should not be thrown by user code.",
+      "severity": "MAJOR",
+      "rule": "csharpsquid:S112"
+    },
+    {
+      "file": "eshop:src/Web/Controllers/ManageController.cs",
+      "message": "'System.ApplicationException' should not be thrown by user code.",
+      "severity": "MAJOR",
+      "rule": "csharpsquid:S112"
+    },
+    {
+      "file": "eshop:src/Web/Controllers/ManageController.cs",
+      "message": "'System.ApplicationException' should not be thrown by user code.",
+      "severity": "MAJOR",
+      "rule": "csharpsquid:S112"
+    },
+    {
+      "file": "eshop:src/Web/Controllers/ManageController.cs",
+      "message": "Remove this argument from the method call; it hides the caller information.",
+      "severity": "MINOR",
+      "rule": "csharpsquid:S3236"
+    },
+    {
+      "file": "eshop:src/Web/Controllers/ManageController.cs",
+      "message": "'System.ApplicationException' should not be thrown by user code.",
+      "severity": "MAJOR",
+      "rule": "csharpsquid:S112"
+    },
+    {
+      "file": "eshop:src/Web/Controllers/ManageController.cs",
+      "message": "'System.ApplicationException' should not be thrown by user code.",
+      "severity": "MAJOR",
+      "rule": "csharpsquid:S112"
+    },
+    {
+      "file": "eshop:src/Web/Controllers/ManageController.cs",
+      "message": "'System.ApplicationException' should not be thrown by user code.",
+      "severity": "MAJOR",
+      "rule": "csharpsquid:S112"
+    },
+    {
+      "file": "eshop:src/Web/Controllers/ManageController.cs",
+      "message": "'System.ApplicationException' should not be thrown by user code.",
+      "severity": "MAJOR",
+      "rule": "csharpsquid:S112"
+    },
+    {
+      "file": "eshop:src/Web/Controllers/ManageController.cs",
+      "message": "'System.ApplicationException' should not be thrown by user code.",
+      "severity": "MAJOR",
+      "rule": "csharpsquid:S112"
+    },
+    {
+      "file": "eshop:src/Web/Controllers/ManageController.cs",
+      "message": "'System.ApplicationException' should not be thrown by user code.",
+      "severity": "MAJOR",
+      "rule": "csharpsquid:S112"
+    },
+    {
+      "file": "eshop:src/Web/Controllers/ManageController.cs",
+      "message": "'System.ApplicationException' should not be thrown by user code.",
+      "severity": "MAJOR",
+      "rule": "csharpsquid:S112"
+    },
+    {
+      "file": "eshop:src/Web/Controllers/ManageController.cs",
+      "message": "'System.ApplicationException' should not be thrown by user code.",
+      "severity": "MAJOR",
+      "rule": "csharpsquid:S112"
+    },
+    {
+      "file": "eshop:src/Web/Controllers/ManageController.cs",
+      "message": "'System.ApplicationException' should not be thrown by user code.",
+      "severity": "MAJOR",
+      "rule": "csharpsquid:S112"
+    },
+    {
+      "file": "eshop:src/Web/Controllers/ManageController.cs",
+      "message": "'System.ApplicationException' should not be thrown by user code.",
+      "severity": "MAJOR",
+      "rule": "csharpsquid:S112"
+    },
+    {
+      "file": "eshop:src/Web/Controllers/ManageController.cs",
+      "message": "'System.ApplicationException' should not be thrown by user code.",
+      "severity": "MAJOR",
+      "rule": "csharpsquid:S112"
+    },
+    {
+      "file": "eshop:src/Web/Controllers/ManageController.cs",
+      "message": "'System.ApplicationException' should not be thrown by user code.",
+      "severity": "MAJOR",
+      "rule": "csharpsquid:S112"
+    },
+    {
+      "file": "eshop:src/Web/Controllers/ManageController.cs",
+      "message": "'System.ApplicationException' should not be thrown by user code.",
+      "severity": "MAJOR",
+      "rule": "csharpsquid:S112"
+    },
+    {
+      "file": "eshop:src/Web/Controllers/ManageController.cs",
+      "message": "'System.ApplicationException' should not be thrown by user code.",
+      "severity": "MAJOR",
+      "rule": "csharpsquid:S112"
+    },
+    {
+      "file": "eshop:src/Web/Controllers/ManageController.cs",
+      "message": "'System.ApplicationException' should not be thrown by user code.",
+      "severity": "MAJOR",
+      "rule": "csharpsquid:S112"
+    },
+    {
+      "file": "eshop:src/Web/Controllers/ManageController.cs",
+      "message": "'System.ApplicationException' should not be thrown by user code.",
+      "severity": "MAJOR",
+      "rule": "csharpsquid:S112"
+    },
+    {
+      "file": "eshop:src/Web/Controllers/ManageController.cs",
+      "message": "All 'EnableAuthenticator' method overloads should be adjacent.",
+      "severity": "MINOR",
+      "rule": "csharpsquid:S4136"
+    },
+    {
+      "file": "eshop:src/Web/Controllers/ManageController.cs",
+      "message": "'System.ApplicationException' should not be thrown by user code.",
+      "severity": "MAJOR",
+      "rule": "csharpsquid:S112"
+    },
+    {
+      "file": "eshop:src/Web/Controllers/ManageController.cs",
+      "message": "'System.ApplicationException' should not be thrown by user code.",
+      "severity": "MAJOR",
+      "rule": "csharpsquid:S112"
+    },
+    {
+      "file": "eshop:src/Web/Controllers/ManageController.cs",
+      "message": "'System.ApplicationException' should not be thrown by user code.",
+      "severity": "MAJOR",
+      "rule": "csharpsquid:S112"
+    },
+    {
+      "file": "eshop:src/Web/Controllers/ManageController.cs",
+      "message": "'System.ApplicationException' should not be thrown by user code.",
+      "severity": "MAJOR",
+      "rule": "csharpsquid:S112"
+    },
+    {
+      "file": "eshop:src/Web/Controllers/ManageController.cs",
+      "message": "'System.ApplicationException' should not be thrown by user code.",
+      "severity": "MAJOR",
+      "rule": "csharpsquid:S112"
+    },
+    {
+      "file": "eshop:src/Web/Controllers/ManageController.cs",
+      "message": "'System.ApplicationException' should not be thrown by user code.",
+      "severity": "MAJOR",
+      "rule": "csharpsquid:S112"
+    },
+    {
+      "file": "eshop:src/Web/Controllers/ManageController.cs",
+      "message": "'System.ApplicationException' should not be thrown by user code.",
+      "severity": "MAJOR",
+      "rule": "csharpsquid:S112"
+    },
+    {
+      "file": "eshop:src/Web/Controllers/ManageController.cs",
+      "message": "Member 'FormatKey' does not access instance data and can be marked as static",
+      "severity": "INFO",
+      "rule": "external_roslyn:CA1822"
+    },
+    {
+      "file": "eshop:src/Web/Controllers/ManageController.cs",
+      "message": "Use 'StringBuilder.Append(char)' instead of 'StringBuilder.Append(string)' when the input is a constant unit string",
+      "severity": "INFO",
+      "rule": "external_roslyn:CA1834"
+    },
+    {
+      "file": "eshop:src/Web/Controllers/ManageController.cs",
+      "message": "Prefer 'AsSpan' over 'Substring' when span-based overloads are available",
+      "severity": "INFO",
+      "rule": "external_roslyn:CA1846"
+    },
+    {
+      "file": "eshop:src/Web/Controllers/ManageController.cs",
+      "message": "Prefer 'AsSpan' over 'Substring' when span-based overloads are available",
+      "severity": "INFO",
+      "rule": "external_roslyn:CA1846"
+    },
+    {
+      "file": "eshop:src/Web/Controllers/OrderController.cs",
+      "message": "Remove this argument from the method call; it hides the caller information.",
+      "severity": "MINOR",
+      "rule": "csharpsquid:S3236"
+    },
+    {
+      "file": "eshop:src/Web/Controllers/OrderController.cs",
+      "message": "Remove this argument from the method call; it hides the caller information.",
+      "severity": "MINOR",
+      "rule": "csharpsquid:S3236"
+    },
+    {
+      "file": "eshop:src/Web/Extensions/CacheHelpers.cs",
+      "message": "Remove this method and declare a constant for this value.",
+      "severity": "MINOR",
+      "rule": "csharpsquid:S3400"
+    },
+    {
+      "file": "eshop:src/Web/Extensions/CacheHelpers.cs",
+      "message": "Remove this method and declare a constant for this value.",
+      "severity": "MINOR",
+      "rule": "csharpsquid:S3400"
+    },
+    {
+      "file": "eshop:src/Web/HealthChecks/ApiHealthCheck.cs",
+      "message": "Forward the 'cancellationToken' parameter to the 'GetAsync' method or pass in 'CancellationToken.None' explicitly to indicate intentionally not propagating the token",
+      "severity": "INFO",
+      "rule": "external_roslyn:CA2016"
+    },
+    {
+      "file": "eshop:src/Web/HealthChecks/ApiHealthCheck.cs",
+      "message": "Forward the 'cancellationToken' parameter to the 'ReadAsStringAsync' method or pass in 'CancellationToken.None' explicitly to indicate intentionally not propagating the token",
+      "severity": "INFO",
+      "rule": "external_roslyn:CA2016"
+    },
+    {
+      "file": "eshop:src/Web/HealthChecks/HomePageHealthCheck.cs",
+      "message": "Forward the 'cancellationToken' parameter to the 'GetAsync' method or pass in 'CancellationToken.None' explicitly to indicate intentionally not propagating the token",
+      "severity": "INFO",
+      "rule": "external_roslyn:CA2016"
+    },
+    {
+      "file": "eshop:src/Web/HealthChecks/HomePageHealthCheck.cs",
+      "message": "Forward the 'cancellationToken' parameter to the 'ReadAsStringAsync' method or pass in 'CancellationToken.None' explicitly to indicate intentionally not propagating the token",
+      "severity": "INFO",
+      "rule": "external_roslyn:CA2016"
+    },
+    {
+      "file": "eshop:src/Web/Pages/Admin/EditCatalogItem.cshtml",
+      "message": "Add an \"alt\" attribute to this image.",
+      "severity": "MINOR",
+      "rule": "Web:ImgWithoutAltCheck"
+    },
+    {
+      "file": "eshop:src/Web/Pages/Admin/Index.cshtml",
+      "message": "Add \"lang\" and/or \"xml:lang\" attributes to this \"<html>\" element",
+      "severity": "MAJOR",
+      "rule": "Web:S5254"
+    },
+    {
+      "file": "eshop:src/Web/Pages/Basket/Checkout.cshtml",
+      "message": "Add an \"alt\" attribute to this image.",
+      "severity": "MINOR",
+      "rule": "Web:ImgWithoutAltCheck"
+    },
+    {
+      "file": "eshop:src/Web/Pages/Basket/Checkout.cshtml",
+      "message": "Add an \"alt\" attribute to this image.",
+      "severity": "MINOR",
+      "rule": "Web:ImgWithoutAltCheck"
+    },
+    {
+      "file": "eshop:src/Web/Pages/Basket/Checkout.cshtml.cs",
+      "message": "Remove this argument from the method call; it hides the caller information.",
+      "severity": "MINOR",
+      "rule": "csharpsquid:S3236"
+    },
+    {
+      "file": "eshop:src/Web/Pages/Basket/Index.cshtml",
+      "message": "Add an \"alt\" attribute to this image.",
+      "severity": "MINOR",
+      "rule": "Web:ImgWithoutAltCheck"
+    },
+    {
+      "file": "eshop:src/Web/Pages/Basket/Index.cshtml",
+      "message": "Add an \"alt\" attribute to this image.",
+      "severity": "MINOR",
+      "rule": "Web:ImgWithoutAltCheck"
+    },
+    {
+      "file": "eshop:src/Web/Pages/Basket/Index.cshtml.cs",
+      "message": "Remove this argument from the method call; it hides the caller information.",
+      "severity": "MINOR",
+      "rule": "csharpsquid:S3236"
+    },
+    {
+      "file": "eshop:src/Web/Pages/Basket/Index.cshtml.cs",
+      "message": "Remove this argument from the method call; it hides the caller information.",
+      "severity": "MINOR",
+      "rule": "csharpsquid:S3236"
+    },
+    {
+      "file": "eshop:src/Web/Pages/Basket/Index.cshtml.cs",
+      "message": "Merge this if statement with the enclosing one.",
+      "severity": "MAJOR",
+      "rule": "csharpsquid:S1066"
+    },
+    {
+      "file": "eshop:src/Web/Pages/Basket/Success.cshtml",
+      "message": "Add an \"alt\" attribute to this image.",
+      "severity": "MINOR",
+      "rule": "Web:ImgWithoutAltCheck"
+    },
+    {
+      "file": "eshop:src/Web/Pages/Basket/Success.cshtml.cs",
+      "message": "Add a nested comment explaining why this method is empty, throw a 'NotSupportedException' or complete the implementation.",
+      "severity": "CRITICAL",
+      "rule": "csharpsquid:S1186"
+    },
+    {
+      "file": "eshop:src/Web/Pages/Index.cshtml",
+      "message": "Add an \"alt\" attribute to this image.",
+      "severity": "MINOR",
+      "rule": "Web:ImgWithoutAltCheck"
+    },
+    {
+      "file": "eshop:src/Web/Pages/Index.cshtml",
+      "message": "Add an \"alt\" attribute to this image.",
+      "severity": "MINOR",
+      "rule": "Web:ImgWithoutAltCheck"
+    },
+    {
+      "file": "eshop:src/Web/Pages/Privacy.cshtml.cs",
+      "message": "Add a nested comment explaining why this method is empty, throw a 'NotSupportedException' or complete the implementation.",
+      "severity": "CRITICAL",
+      "rule": "csharpsquid:S1186"
+    },
+    {
+      "file": "eshop:src/Web/Pages/Shared/Components/BasketComponent/Basket.cs",
+      "message": "Remove this argument from the method call; it hides the caller information.",
+      "severity": "MINOR",
+      "rule": "csharpsquid:S3236"
+    },
+    {
+      "file": "eshop:src/Web/Pages/Shared/Components/BasketComponent/Default.cshtml",
+      "message": "Add an \"alt\" attribute to this image.",
+      "severity": "MINOR",
+      "rule": "Web:ImgWithoutAltCheck"
+    },
+    {
+      "file": "eshop:src/Web/Pages/Shared/_editCatalog.cshtml",
+      "message": "Add an \"alt\" attribute to this image.",
+      "severity": "MINOR",
+      "rule": "Web:ImgWithoutAltCheck"
+    },
+    {
+      "file": "eshop:src/Web/Pages/Shared/_product.cshtml",
+      "message": "Add an \"alt\" attribute to this image.",
+      "severity": "MINOR",
+      "rule": "Web:ImgWithoutAltCheck"
+    },
+    {
+      "file": "eshop:src/Web/Program.cs",
+      "message": "Prefer 'static readonly' fields over constant array arguments if the called method is called repeatedly and is not mutating the passed array",
+      "severity": "INFO",
+      "rule": "external_roslyn:CA1861"
+    },
+    {
+      "file": "eshop:src/Web/Program.cs",
+      "message": "Prefer 'static readonly' fields over constant array arguments if the called method is called repeatedly and is not mutating the passed array",
+      "severity": "INFO",
+      "rule": "external_roslyn:CA1861"
+    },
+    {
+      "file": "eshop:src/Web/Program.cs",
+      "message": "Remove this commented out code.",
+      "severity": "MAJOR",
+      "rule": "csharpsquid:S125"
+    },
+    {
+      "file": "eshop:src/Web/Services/CatalogItemViewModelService.cs",
+      "message": "Remove this argument from the method call; it hides the caller information.",
+      "severity": "MINOR",
+      "rule": "csharpsquid:S3236"
+    },
+    {
+      "file": "eshop:src/Web/SlugifyParameterTransformer.cs",
+      "message": "Use 'GeneratedRegexAttribute' to generate the regular expression implementation at compile-time.",
+      "severity": "INFO",
+      "rule": "external_roslyn:SYSLIB1045"
+    },
+    {
+      "file": "eshop:src/Web/ViewModels/Account/LoginWith2faViewModel.cs",
+      "message": "Rename class 'LoginWith2faViewModel' to match pascal case naming rules, consider using 'LoginWith2FaViewModel'.",
+      "severity": "MINOR",
+      "rule": "csharpsquid:S101"
+    },
+    {
+      "file": "eshop:src/Web/Views/Manage/ExternalLogins.cshtml",
+      "message": "Add a description to this table.",
+      "severity": "MINOR",
+      "rule": "Web:TableWithoutCaptionCheck"
+    },
+    {
+      "file": "eshop:src/Web/Views/Manage/ExternalLogins.cshtml",
+      "message": "Add \"<th>\" headers to this \"<table>\".",
+      "severity": "MAJOR",
+      "rule": "Web:S5256"
+    },
+    {
+      "file": "eshop:src/Web/Views/Order/Detail.cshtml",
+      "message": "Verify this is the index/key that was intended; a value has already been set for it.",
+      "severity": "MAJOR",
+      "rule": "csharpsquid:S4143"
+    },
+    {
+      "file": "eshop:src/Web/Views/Order/Detail.cshtml",
+      "message": "Add an \"alt\" attribute to this image.",
+      "severity": "MINOR",
+      "rule": "Web:ImgWithoutAltCheck"
+    },
+    {
+      "file": "eshop:src/Web/Views/Shared/Components/Basket/Default.cshtml",
+      "message": "Add an \"alt\" attribute to this image.",
+      "severity": "MINOR",
+      "rule": "Web:ImgWithoutAltCheck"
+    },
+    {
+      "file": "eshop:src/Web/Views/Shared/_Layout.cshtml",
+      "message": "Add \"lang\" and/or \"xml:lang\" attributes to this \"<html>\" element",
+      "severity": "MAJOR",
+      "rule": "Web:S5254"
+    },
+    {
+      "file": "eshop:src/Web/Views/Shared/_LoginPartial.cshtml",
+      "message": "Add an \"alt\" attribute to this image.",
+      "severity": "MINOR",
+      "rule": "Web:ImgWithoutAltCheck"
+    },
+    {
+      "file": "eshop:src/Web/Views/Shared/_LoginPartial.cshtml",
+      "message": "Add an \"alt\" attribute to this image.",
+      "severity": "MINOR",
+      "rule": "Web:ImgWithoutAltCheck"
+    },
+    {
+      "file": "eshop:tests/FunctionalTests/PublicApi/ApiTokenHelper.cs",
+      "message": "Avoid unnecessary zero-length array allocations.  Use Array.Empty<string>() instead.",
+      "severity": "INFO",
+      "rule": "external_roslyn:CA1825"
+    },
+    {
+      "file": "eshop:tests/FunctionalTests/Web/WebPageHelpers.cs",
+      "message": "Non-constant fields should not be visible",
+      "severity": "INFO",
+      "rule": "external_roslyn:CA2211"
+    },
+    {
+      "file": "eshop:tests/IntegrationTests/Repositories/BasketRepositoryTests/SetQuantities.cs",
+      "message": "Do not use Assert.Equal() to check for collection size. Use Assert.Empty instead.",
+      "severity": "MAJOR",
+      "rule": "external_roslyn:xUnit2013"
+    },
+    {
+      "file": "eshop:tests/PublicApiIntegrationTests/ApiTokenHelper.cs",
+      "message": "Avoid unnecessary zero-length array allocations.  Use Array.Empty<string>() instead.",
+      "severity": "INFO",
+      "rule": "external_roslyn:CA1825"
+    },
+    {
+      "file": "eshop:tests/PublicApiIntegrationTests/CatalogItemEndpoints/CatalogItemListPagedEndpoint.cs",
+      "message": "Use the \"Count\" property instead of Enumerable.Count()",
+      "severity": "INFO",
+      "rule": "external_roslyn:CA1829"
+    },
+    {
+      "file": "eshop:tests/PublicApiIntegrationTests/CatalogItemEndpoints/CatalogItemListPagedEndpoint.cs",
+      "message": "Use the \"Count\" property instead of Enumerable.Count()",
+      "severity": "INFO",
+      "rule": "external_roslyn:CA1829"
+    },
+    {
+      "file": "eshop:tests/PublicApiIntegrationTests/CatalogItemEndpoints/CatalogItemListPagedEndpoint.cs",
+      "message": "Use the \"Count\" property instead of Enumerable.Count()",
+      "severity": "INFO",
+      "rule": "external_roslyn:CA1829"
+    },
+    {
+      "file": "eshop:tests/UnitTests/ApplicationCore/Entities/BasketTests/BasketRemoveEmptyItems.cs",
+      "message": "Do not use Assert.Equal() to check for collection size. Use Assert.Empty instead.",
+      "severity": "MAJOR",
+      "rule": "external_roslyn:xUnit2013"
+    },
+    {
+      "file": "eshop:tests/UnitTests/ApplicationCore/Extensions/TestChild.cs",
+      "message": "Type Microsoft.eShopWeb.UnitTests.ApplicationCore.Extensions.TestChild should override Equals because it implements IEquatable<T>",
+      "severity": "INFO",
+      "rule": "external_roslyn:CA1067"
+    },
+    {
+      "file": "eshop:tests/UnitTests/ApplicationCore/Extensions/TestParent.cs",
+      "message": "Type Microsoft.eShopWeb.UnitTests.ApplicationCore.Extensions.TestParent should override Equals because it implements IEquatable<T>",
+      "severity": "INFO",
+      "rule": "external_roslyn:CA1067"
+    },
+    {
+      "file": "eshop:tests/UnitTests/ApplicationCore/Specifications/CatalogFilterPaginatedSpecification.cs",
+      "message": "Member 'GetTestCollection' does not access instance data and can be marked as static",
+      "severity": "INFO",
+      "rule": "external_roslyn:CA1822"
+    },
+    {
+      "file": "eshop:tests/UnitTests/ApplicationCore/Specifications/CatalogFilterSpecification.cs",
+      "message": "Use the \"Count\" property instead of Enumerable.Count()",
+      "severity": "INFO",
+      "rule": "external_roslyn:CA1829"
+    },
+    {
+      "file": "eshop:tests/UnitTests/ApplicationCore/Specifications/CatalogFilterSpecification.cs",
+      "message": "Member 'GetTestItemCollection' does not access instance data and can be marked as static",
+      "severity": "INFO",
+      "rule": "external_roslyn:CA1822"
+    },
+    {
+      "file": "eshop:tests/UnitTests/ApplicationCore/Specifications/CatalogItemsSpecification.cs",
+      "message": "Member 'GetTestCollection' does not access instance data and can be marked as static",
+      "severity": "INFO",
+      "rule": "external_roslyn:CA1822"
+    },
+    {
+      "file": "eshop:tests/UnitTests/ApplicationCore/Specifications/CustomerOrdersWithItemsSpecification.cs",
+      "message": "Do not use Assert.Equal() to check for collection size. Use Assert.Single instead.",
+      "severity": "MAJOR",
+      "rule": "external_roslyn:xUnit2013"
+    },
+    {
+      "file": "eshop:tests/UnitTests/ApplicationCore/Specifications/CustomerOrdersWithItemsSpecification.cs",
+      "message": "Do not use Assert.Equal() to check for collection size. Use Assert.Single instead.",
+      "severity": "MAJOR",
+      "rule": "external_roslyn:xUnit2013"
+    },
+    {
+      "file": "eshop:tests/UnitTests/Builders/AddressBuilder.cs",
+      "message": "Member 'TestStreet' does not access instance data and can be marked as static",
+      "severity": "INFO",
+      "rule": "external_roslyn:CA1822"
+    },
+    {
+      "file": "eshop:tests/UnitTests/Builders/AddressBuilder.cs",
+      "message": "Member 'TestCity' does not access instance data and can be marked as static",
+      "severity": "INFO",
+      "rule": "external_roslyn:CA1822"
+    },
+    {
+      "file": "eshop:tests/UnitTests/Builders/AddressBuilder.cs",
+      "message": "Member 'TestState' does not access instance data and can be marked as static",
+      "severity": "INFO",
+      "rule": "external_roslyn:CA1822"
+    },
+    {
+      "file": "eshop:tests/UnitTests/Builders/AddressBuilder.cs",
+      "message": "Member 'TestCountry' does not access instance data and can be marked as static",
+      "severity": "INFO",
+      "rule": "external_roslyn:CA1822"
+    },
+    {
+      "file": "eshop:tests/UnitTests/Builders/AddressBuilder.cs",
+      "message": "Member 'TestZipCode' does not access instance data and can be marked as static",
+      "severity": "INFO",
+      "rule": "external_roslyn:CA1822"
+    },
+    {
+      "file": "eshop:tests/UnitTests/Builders/BasketBuilder.cs",
+      "message": "Member 'BasketBuyerId' does not access instance data and can be marked as static",
+      "severity": "INFO",
+      "rule": "external_roslyn:CA1822"
+    },
+    {
+      "file": "eshop:tests/UnitTests/Builders/BasketBuilder.cs",
+      "message": "Member 'BasketId' does not access instance data and can be marked as static",
+      "severity": "INFO",
+      "rule": "external_roslyn:CA1822"
+    },
+    {
+      "file": "eshop:tests/UnitTests/Builders/OrderBuilder.cs",
+      "message": "Member 'TestBuyerId' does not access instance data and can be marked as static",
+      "severity": "INFO",
+      "rule": "external_roslyn:CA1822"
+    },
+    {
+      "file": "eshop:tests/UnitTests/Builders/OrderBuilder.cs",
+      "message": "Member 'TestCatalogItemId' does not access instance data and can be marked as static",
+      "severity": "INFO",
+      "rule": "external_roslyn:CA1822"
+    },
+    {
+      "file": "eshop:tests/UnitTests/Builders/OrderBuilder.cs",
+      "message": "Member 'TestProductName' does not access instance data and can be marked as static",
+      "severity": "INFO",
+      "rule": "external_roslyn:CA1822"
+    },
+    {
+      "file": "eshop:tests/UnitTests/Builders/OrderBuilder.cs",
+      "message": "Member 'TestPictureUri' does not access instance data and can be marked as static",
+      "severity": "INFO",
+      "rule": "external_roslyn:CA1822"
+    }
+  ]
+}

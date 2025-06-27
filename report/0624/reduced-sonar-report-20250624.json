@@ -1,6 +1,36 @@
 {
   "issues": [
     {
+      "file": "eshop:YAML/record/init/reducedSonar__init__.py",
+      "message": "Remove the unused local variable \"e\".",
+      "severity": "MINOR",
+      "rule": "python:S1481"
+    },
+    {
+      "file": "eshop:function_app.py",
+      "message": "Rename function \"AnalyzeSonarReport\" to match the regular expression ^[a-z_][a-z0-9_]*$.",
+      "severity": "MAJOR",
+      "rule": "python:S1542"
+    },
+    {
+      "file": "eshop:sonar-gpt-fn/AnalyzeSonarReport/__init__.py",
+      "message": "Remove the unused local variable \"e\".",
+      "severity": "MINOR",
+      "rule": "python:S1481"
+    },
+    {
+      "file": "eshop:sonar-gpt-fn/function_app.py",
+      "message": "Rename function \"AnalyzeSonarReport\" to match the regular expression ^[a-z_][a-z0-9_]*$.",
+      "severity": "MAJOR",
+      "rule": "python:S1542"
+    },
+    {
+      "file": "eshop:azure-function/AnalyzeSonarReport/__init__.py",
+      "message": "Remove the unused local variable \"e\".",
+      "severity": "MINOR",
+      "rule": "python:S1481"
+    },
+    {
       "file": "eshop:src/Web/wwwroot/css/_variables.css",
       "message": "Unexpected empty source",
       "severity": "MAJOR",
