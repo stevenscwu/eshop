@@ -13,8 +13,8 @@ jobs:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       OPENAI_API_BASE: ${{ secrets.OPENAI_API_BASE }}
       OPENAI_DEPLOYMENT_NAME: ${{ secrets.OPENAI_DEPLOYMENT_NAME }}
-      AZURE_BLOB_SAS_URL: ${{ secrets.AZURE_BLOB_SAS_URL }}
-      AZURE_BLOB_SAS_TOKEN: ${{ secrets.AZURE_BLOB_SAS_TOKEN }}
+      BLOB_SAS_URL: ${{ secrets.BLOB_SAS_URL }}
+      BLOB_SAS_TOKEN: ${{ secrets.BLOB_SAS_TOKEN }}
 
     steps:
       - name: Checkout code
@@ -98,8 +98,8 @@ jobs:
       - name: Upload SonarQube Raw Report to Azure Blob
         env:
           DOTNET_ROOT: /usr/share/dotnet
-          AZURE_BLOB_SAS_URL: ${{ secrets.AZURE_BLOB_SAS_URL }}
-          AZURE_BLOB_SAS_TOKEN: ${{ secrets.AZURE_BLOB_SAS_TOKEN }}
+          BLOB_SAS_URL: ${{ secrets.BLOB_SAS_URL }}
+          BLOB_SAS_TOKEN: ${{ secrets.BLOB_SAS_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
           sudo apt-get update && sudo apt-get install -y jq
@@ -107,37 +107,40 @@ jobs:
           TIMESTAMP=$(date +%Y%m%d)
           FOLDER_DATE=$(date +%Y%m%d)
 
-          FILE1="sonar-report-${TIMESTAMP}.json"
-          FILE2="reduced-sonar-report-${TIMESTAMP}.json"
+          BASE_URL="${BLOB_SAS_URL}"
+          SAS_TOKEN="${BLOB_SAS_TOKEN}"
 
-          jq '.' sonar-report.json > "$FILE1"
-          jq '{issues: [.issues[] | {file: .component, message: .message, severity: .severity, rule: .rule}]}' "$FILE1" > "$FILE2"
+          # Create beautified version of sonar-report.json
+          BEAUTIFIED="sonar-report-${TIMESTAMP}.json"
+          jq '.' sonar-report.json > "$BEAUTIFIED"
 
-          for FILE in "$FILE1" "$FILE2"; do
-            ENCODED_FILE=$(echo -n "$FILE" | jq -sRr @uri)
-            FULL_URL="${AZURE_BLOB_SAS_URL}/${ENCODED_FILE}${AZURE_BLOB_SAS_TOKEN}"
-            echo "Uploading $FILE to $FULL_URL"
-            curl -s -S -f -X PUT "$FULL_URL" \
+          # Create reduced version for GPT
+          REDUCED="reduced-sonar-report-${TIMESTAMP}.json"
+          jq '{issues: [.issues[] | {file: .component, message: .message, severity: .severity, rule: .rule}]}' "$BEAUTIFIED" > "$REDUCED"
+
+          # Upload both files to Azure Blob
+          for FILE in "$BEAUTIFIED" "$REDUCED"; do
+            curl -s -S -f -X PUT "${BASE_URL}/${FILE}?${SAS_TOKEN}" \
               -H "x-ms-blob-type: BlockBlob" \
               -H "x-ms-version: 2021-10-04" \
               --data-binary @"$FILE"
           done
 
           mkdir -p "report/${FOLDER_DATE}"
-          cp "$FILE1" "report/${FOLDER_DATE}/"
-          cp "$FILE2" "report/${FOLDER_DATE}/"
+          cp "$BEAUTIFIED" "report/${FOLDER_DATE}/"
+          cp "$REDUCED" "report/${FOLDER_DATE}/"
           echo "Reports saved to report/${FOLDER_DATE}/"
 
       - name: Validate and Sanitize JSON
         env:
-          AZURE_BLOB_SAS_URL: ${{ secrets.AZURE_BLOB_SAS_URL }}
-          AZURE_BLOB_SAS_TOKEN: ${{ secrets.AZURE_BLOB_SAS_TOKEN }}
+          BLOB_SAS_URL: ${{ secrets.BLOB_SAS_URL }}
+          BLOB_SAS_TOKEN: ${{ secrets.BLOB_SAS_TOKEN }}
         run: |
           DATE=$(date +%Y%m%d)
           REDUCED="reduced-sonar-report-${DATE}.json"
 
           echo "🔽 Downloading $REDUCED"
-          curl -o "$REDUCED" "${AZURE_BLOB_SAS_URL}/${REDUCED}?${AZURE_BLOB_SAS_TOKEN}"
+          curl -o "$REDUCED" "${BLOB_SAS_URL}/${REDUCED}?${BLOB_SAS_TOKEN}"
 
           echo "🧹 Stripping BOM (if present)..."
           tail -c +1 "$REDUCED" | sed '1s/^\xEF\xBB\xBF//' > clean.json
@@ -146,6 +149,67 @@ jobs:
           jq empty clean.json || (echo "❌ Invalid JSON format!" && exit 1)
 
           mv clean.json "$REDUCED"
+
+      - name: Summarize SonarQube Issues via GPT-4 on Azure Function
+        env:
+          BLOB_SAS_URL: ${{ secrets.BLOB_SAS_URL }}
+          BLOB_SAS_TOKEN: ${{ secrets.BLOB_SAS_TOKEN }}
+          AZURE_FUNCTION_URL: ${{ secrets.AZURE_FUNCTION_URL }}
+          AZURE_FUNCTION_KEY: ${{ secrets.AZURE_FUNCTION_KEY }}
+        run: |
+      - name: 13_Summarize SonarQube Issues via GPT-4 on Azure Function
+        env:
+          AZURE_FUNCTION_URL: ${{ secrets.AZURE_FUNCTION_URL }}
+          AZURE_FUNCTION_KEY: ${{ secrets.AZURE_FUNCTION_KEY }}
+
+        run: |
+          set -e  # fail on error
+
+          DATE=$(date +%Y%m%d)
+          REDUCED="reduced-sonar-report-${DATE}.json"
+          WRAPPED="wrapped-sonar-report-${DATE}.json"
+
+          echo "🔁 Wrapping JSON file to expected format..."
+          if [[ ! -f "$REDUCED" ]]; then
+          echo "❌ Reduced report file not found: $REDUCED"
+          exit 1
+          fi
+
+          jq '{issues: .}' "$REDUCED" > "$WRAPPED"
+
+          echo "📤 Sending request to Azure Function at $AZURE_FUNCTION_URL"
+
+          if [[ -z "$AZURE_FUNCTION_URL" ]]; then
+            echo "❌ AZURE_FUNCTION_URL is not set."
+            exit 3
+          fi
+
+          if [[ -z "$AZURE_FUNCTION_KEY" ]]; then
+            echo "❌ AZURE_FUNCTION_KEY is not set."
+            exit 4
+          fi
+
+          STATUS_CODE=$(curl -s -o response.txt -w "%{http_code}" -X POST "$AZURE_FUNCTION_URL/api/AnalyzeSonarReport" \
+            -H "Content-Type: application/json" \
+            -H "x-functions-key: $AZURE_FUNCTION_KEY" \
+            --data "@$WRAPPED")
+
+          echo "📨 Azure Function response status: $STATUS_CODE"
+          echo "📄 Azure Function output:"
+          cat response.txt
+
+          if [[ "$STATUS_CODE" -ne 200 ]]; then
+            echo "❌ Azure Function returned HTTP $STATUS_CODE"
+            exit 1
+          fi
+
+          mv response.txt gpt-summary-${DATE}.md
+
+          echo "☁️ Uploading to Azure Blob..."
+          curl -s -S -f -X PUT "${BLOB_SAS_URL}/gpt-summary-${DATE}.md?${BLOB_SAS_TOKEN}" \
+            -H "x-ms-blob-type: BlockBlob" \
+            -H "x-ms-version: 2021-10-04" \
+            --data-binary "@gpt-summary-${DATE}.md"
 
 
     
