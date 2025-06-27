@@ -95,8 +95,15 @@ jobs:
           TIMESTAMP=$(date +%Y%m%d)
           FOLDER_DATE=$(date +%Y%m%d)
 
-          BASE_URL="${BLOB_SAS_URL}"
-          SAS_TOKEN="${BLOB_SAS_TOKEN}"
+          # Explicitly handle and trim newline from secrets
+          echo -n "${{ secrets.BLOB_SAS_URL }}" > blob_sas_url.txt
+          echo -n "${{ secrets.BLOB_SAS_TOKEN }}" > blob_sas_token.txt
+          BASE_URL=$(cat blob_sas_url.txt)
+          SAS_TOKEN=$(cat blob_sas_token.txt)
+
+          # Diagnostic echo for debugging (temporary, remove after debugging)
+          echo "Using BASE_URL: $BASE_URL"
+          echo "Using SAS_TOKEN: $SAS_TOKEN"
 
           # Create beautified version of sonar-report.json
           BEAUTIFIED="sonar-report-${TIMESTAMP}.json"
