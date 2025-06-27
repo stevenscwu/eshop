@@ -114,20 +114,19 @@ jobs:
           jq '{issues: [.issues[] | {file: .component, message: .message, severity: .severity, rule: .rule}]}' "$FILE1" > "$FILE2"
 
           for FILE in "$FILE1" "$FILE2"; do
-            ENCODED_FILE=$(printf '%s
-          ' "$FILE" | jq -sRr @uri)
-                FULL_URL="${AZURE_BLOB_SAS_URL}/${ENCODED_FILE}${AZURE_BLOB_SAS_TOKEN}"
-                echo "Uploading $FILE to $FULL_URL"
-                curl -s -S -f -X PUT "$FULL_URL" \
-                  -H "x-ms-blob-type: BlockBlob" \
-                  -H "x-ms-version: 2021-10-04" \
-                  --data-binary @"$FILE"
-              done
+            ENCODED_FILE=$(echo -n "$FILE" | jq -sRr @uri)
+            FULL_URL="${AZURE_BLOB_SAS_URL}/${ENCODED_FILE}${AZURE_BLOB_SAS_TOKEN}"
+            echo "Uploading $FILE to $FULL_URL"
+            curl -s -S -f -X PUT "$FULL_URL" \
+              -H "x-ms-blob-type: BlockBlob" \
+              -H "x-ms-version: 2021-10-04" \
+              --data-binary @"$FILE"
+          done
 
-              mkdir -p "report/${FOLDER_DATE}"
-              cp "$FILE1" "report/${FOLDER_DATE}/"
-              cp "$FILE2" "report/${FOLDER_DATE}/"
-              echo "Reports saved to report/${FOLDER_DATE}/"
+          mkdir -p "report/${FOLDER_DATE}"
+          cp "$FILE1" "report/${FOLDER_DATE}/"
+          cp "$FILE2" "report/${FOLDER_DATE}/"
+          echo "Reports saved to report/${FOLDER_DATE}/"
 
       - name: Validate and Sanitize JSON
         env:
