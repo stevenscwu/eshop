@@ -1,5 +1,15 @@
 # Security Analysis Pipeline with SonarQube + GPT-4 + Azure Blob Upload
-name: Fullstack Security Analysis with SonarQube
+name: Security Analysis with SonarQube
+
+env:
+  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+  OPENAI_API_BASE: ${{ secrets.OPENAI_API_BASE }}
+  OPENAI_DEPLOYMENT_NAME: ${{ secrets.OPENAI_DEPLOYMENT_NAME }}
+  BLOB_SAS_URL: ${{ secrets.BLOB_SAS_URL }}
+  BLOB_SAS_TOKEN: ${{ secrets.BLOB_SAS_TOKEN }}
+  SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+  SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+  DOTNET_ROOT: /usr/share/dotnet
 
 on:
   workflow_dispatch:
@@ -9,12 +19,6 @@ on:
 jobs:
   analyze:
     runs-on: ubuntu-latest
-    env:
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      OPENAI_API_BASE: ${{ secrets.OPENAI_API_BASE }}
-      OPENAI_DEPLOYMENT_NAME: ${{ secrets.OPENAI_DEPLOYMENT_NAME }}
-      BLOB_SAS_URL: ${{ secrets.BLOB_SAS_URL }}
-      BLOB_SAS_TOKEN: ${{ secrets.BLOB_SAS_TOKEN }}
 
     steps:
       - name: Checkout code
@@ -34,9 +38,6 @@ jobs:
           sudo apt-get install -y jq
 
       - name: Begin SonarQube Scan
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
         run: |
           dotnet sonarscanner begin \
             /k:"eshop" \
@@ -54,8 +55,6 @@ jobs:
           dotnet build eShopOnWeb.sln --no-incremental
 
       - name: End SonarQube Scan
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
           dotnet sonarscanner end /d:sonar.login="${SONAR_TOKEN}"
 
@@ -63,9 +62,6 @@ jobs:
         run: sleep 60
 
       - name: Download SonarQube Issues
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
         run: |
           PROJECT_KEY="eshop"
           AUTH_HEADER="Authorization: Basic $(echo -n "${SONAR_TOKEN}:" | base64)"
@@ -96,11 +92,6 @@ jobs:
           fi
 
       - name: Upload SonarQube Raw Report to Azure Blob
-        env:
-          DOTNET_ROOT: /usr/share/dotnet
-          BLOB_SAS_URL: ${{ secrets.BLOB_SAS_URL }}
-          BLOB_SAS_TOKEN: ${{ secrets.BLOB_SAS_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
           sudo apt-get update && sudo apt-get install -y jq
 
@@ -132,9 +123,6 @@ jobs:
           echo "Reports saved to report/${FOLDER_DATE}/"
 
       - name: Validate and Sanitize JSON
-        env:
-          BLOB_SAS_URL: ${{ secrets.BLOB_SAS_URL }}
-          BLOB_SAS_TOKEN: ${{ secrets.BLOB_SAS_TOKEN }}
         run: |
           DATE=$(date +%Y%m%d)
           REDUCED="reduced-sonar-report-${DATE}.json"
@@ -151,17 +139,6 @@ jobs:
           mv clean.json "$REDUCED"
 
       - name: Summarize SonarQube Issues via GPT-4 on Azure Function
-        env:
-          BLOB_SAS_URL: ${{ secrets.BLOB_SAS_URL }}
-          BLOB_SAS_TOKEN: ${{ secrets.BLOB_SAS_TOKEN }}
-          AZURE_FUNCTION_URL: ${{ secrets.AZURE_FUNCTION_URL }}
-          AZURE_FUNCTION_KEY: ${{ secrets.AZURE_FUNCTION_KEY }}
-        run: |
-      - name: 13_Summarize SonarQube Issues via GPT-4 on Azure Function
-        env:
-          AZURE_FUNCTION_URL: ${{ secrets.AZURE_FUNCTION_URL }}
-          AZURE_FUNCTION_KEY: ${{ secrets.AZURE_FUNCTION_KEY }}
-
         run: |
           set -e  # fail on error
 
