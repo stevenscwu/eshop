@@ -37,7 +37,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y jq
 
-      - name: Begin SonarQube Scan
+      - name: Begin Sonar Scan and Build
         run: |
           dotnet sonarscanner begin \
             /k:"eshop" \
@@ -46,10 +46,7 @@ jobs:
             /d:sonar.report.export.path=sonar-report.json \
             /d:sonar.verbose=true \
             /d:sonar.exclusions="**/obj/**,**/bin/**,**/*.json,**/BlazorAdmin/**,infra/core/database/sqlserver/**,infra/core/security/keyvault.bicep,infra/core/host/appservice.bicep"
-
-      - name: Clean, Restore and Build
-        run: |
-          # Explicitly specify solution file to avoid "more than one project" error
+          
           dotnet clean eShopOnWeb.sln
           dotnet restore eShopOnWeb.sln
           dotnet build eShopOnWeb.sln --no-incremental
