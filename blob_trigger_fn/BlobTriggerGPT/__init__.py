@@ -27,7 +27,7 @@ def main(inputblob: func.InputStream, outputblob: func.Out[str]):
     # --- OpenAI credentials ---
     try:
         openai.api_type = "azure"
-        openai.api_version = "2024-12-01-preview"
+        openai.api_version = "2025-01-01-preview"
         openai.api_base = os.environ["OPENAI_API_BASE"]
         openai.api_key = os.environ["OPENAI_API_KEY"]
         deployment_id = os.environ["OPENAI_DEPLOYMENT_NAME"]
