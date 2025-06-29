@@ -91,7 +91,7 @@ jobs:
       - name: Upload SonarQube Reports using Azure CLI with SAS Token
         env:
           AZURE_STORAGE_SAS_TOKEN: ${{ secrets.BLOB_SAS_TOKEN }}
-          AZURE_STORAGE_ACCOUNT: sonar101storage
+          AZURE_STORAGE_ACCOUNT: storagedevsecops
           AZURE_STORAGE_CONTAINER: sonarinput
         run: |
           sudo apt-get update && sudo apt-get install -y jq azure-cli
