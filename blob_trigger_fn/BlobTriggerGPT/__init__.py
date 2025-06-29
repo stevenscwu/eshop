@@ -1,7 +1,6 @@
 import logging, os, json, time
 import azure.functions as func
-import openai
-from openai import OpenAIError
+from openai import AzureOpenAI
 
 def main(inputblob: func.InputStream, outputblob: func.Out[str]):
     logging.info("Processing blob: %s (%s bytes)", inputblob.name, inputblob.length)
@@ -24,31 +23,33 @@ def main(inputblob: func.InputStream, outputblob: func.Out[str]):
         f"Analysis results:\n{data}"
     )
 
-    # --- OpenAI credentials ---
+    # --- OpenAI credentials (env vars) ---
     try:
-        openai.api_type = "azure"
-        openai.api_version = "2024-12-01-preview"
-        openai.api_base = os.environ["OPENAI_API_BASE"]
-        openai.api_key = os.environ["OPENAI_API_KEY"]
-        deployment_id = os.environ["OPENAI_DEPLOYMENT_NAME"]
+        api_base = os.environ["OPENAI_API_BASE"]
+        api_key = os.environ["OPENAI_API_KEY"]
+        deployment_name = os.environ["OPENAI_DEPLOYMENT_NAME"]
+        api_version = os.environ.get("OPENAI_API_VERSION", "2024-12-01-preview")
     except KeyError as missing:
         logging.error("Missing env var: %s", missing)
         raise
 
-    # --- Call model ---
-    start = time.time()
-
-    client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"), base_url=os.getenv("OPENAI_API_BASE"))
-    deployment_name = os.getenv("OPENAI_DEPLOYMENT_NAME")
+    # --- Create AzureOpenAI client ---
+    client = AzureOpenAI(
+        api_key=api_key,
+        azure_endpoint=api_base,
+        api_version=api_version,
+    )
 
     logging.info(f"Using deployment_name: {deployment_name}")
-    logging.info(f"Using API base in deployed model: {os.getenv('OPENAI_API_BASE')}")
-    logging.info(f"API type: {openai.api_type}, version: {openai.api_version}")
+    logging.info(f"Using API base: {api_base}")
+    logging.info(f"API version: {api_version}")
 
+    # --- Call model ---
     summary = ""
+    start = time.time()
     try:
         chat_response = client.chat.completions.create(
-            model=deployment_name,
+            model=deployment_name,  # <- this is the Azure "deployment name"!
             messages=[
                 {"role": "system", "content": prompt},
                 {"role": "user", "content": data},
@@ -60,7 +61,6 @@ def main(inputblob: func.InputStream, outputblob: func.Out[str]):
     except Exception as e:
         logging.error("OpenAI API error: %s", repr(e))
         summary = f"OpenAI API error: {e}"
-
 
     latency_ms = (time.time() - start) * 1000
     logging.info("OpenAI latency: %.0f ms", latency_ms)
