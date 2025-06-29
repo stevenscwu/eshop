@@ -42,7 +42,7 @@ def main(inputblob: func.InputStream, outputblob: func.Out[str]):
     deployment_name = os.getenv("OPENAI_DEPLOYMENT_NAME")
 
     logging.info(f"Using deployment_name: {deployment_name}")
-    logging.info(f"Using API base: {os.getenv('OPENAI_API_BASE')}")
+    logging.info(f"Using API base in deployed model: {os.getenv('OPENAI_API_BASE')}")
     logging.info(f"API type: {openai.api_type}, version: {openai.api_version}")
 
     summary = ""
