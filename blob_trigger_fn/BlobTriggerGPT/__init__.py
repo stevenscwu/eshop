@@ -1,6 +1,7 @@
 import logging, os, json, time
 import azure.functions as func
 import openai
+from openai import OpenAIError
 
 def main(inputblob: func.InputStream, outputblob: func.Out[str]):
     logging.info("Processing blob: %s (%s bytes)", inputblob.name, inputblob.length)
@@ -26,7 +27,7 @@ def main(inputblob: func.InputStream, outputblob: func.Out[str]):
     # --- OpenAI credentials ---
     try:
         openai.api_type = "azure"
-        openai.api_version = "2024-11-20"
+        openai.api_version = "2024-12-01-preview"
         openai.api_base = os.environ["OPENAI_API_BASE"]
         openai.api_key = os.environ["OPENAI_API_KEY"]
         deployment_id = os.environ["OPENAI_DEPLOYMENT_NAME"]
@@ -36,18 +37,32 @@ def main(inputblob: func.InputStream, outputblob: func.Out[str]):
 
     # --- Call model ---
     start = time.time()
+
+    client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"), base_url=os.getenv("OPENAI_API_BASE"))
+    deployment_name = os.getenv("OPENAI_DEPLOYMENT_NAME")
+
+    logging.info(f"Using deployment_name: {deployment_name}")
+    logging.info(f"Using API base: {os.getenv('OPENAI_API_BASE')}")
+    logging.info(f"API type: {openai.api_type}, version: {openai.api_version}")
+
+    summary = ""
     try:
-        response = openai.ChatCompletion.create(
-            deployment_id=deployment_id,
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=3000
+        chat_response = client.chat.completions.create(
+            model=deployment_name,
+            messages=[
+                {"role": "system", "content": prompt},
+                {"role": "user", "content": data},
+            ],
+            temperature=0.2,
+            max_tokens=1500,
         )
-    except openai.error.OpenAIError as e:
-        logging.exception("OpenAI call failed: %s", e)
-        raise
+        summary = chat_response.choices[0].message.content
+    except Exception as e:
+        logging.error("OpenAI API error: %s", repr(e))
+        summary = f"OpenAI API error: {e}"
+
 
     latency_ms = (time.time() - start) * 1000
     logging.info("OpenAI latency: %.0f ms", latency_ms)
 
-    summary = response.choices[0].message.content
     outputblob.set(summary)
