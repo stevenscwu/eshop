@@ -7,7 +7,7 @@ def main(inputblob: func.InputStream, outputblob: func.Out[str]):
 
     data = inputblob.read().decode("utf-8")
     if len(data) > 1_000_000:  # 1 MB guard – adjust as needed
-        logging.warning("Input file too large; aborting.")
+        logging.warning("Too large input file; aborting.")
         return
 
     prompt = (
