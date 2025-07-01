@@ -1,0 +1,90 @@
+# Static Analysis Security Review
+
+## 1. **Prioritized Issue Summary Table**
+
+| Priority | File/Module | Severity   | Rule/Message                                                                                         | Why Critical?                                                                                      |
+|----------|-------------|------------|-----------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------|
+| 1        | `src/Infrastructure/Data/CatalogContext.cs` | CRITICAL   | S927: Rename parameter 'builder' to 'modelBuilder' to match the base class declaration.             | Breaking base class contract can cause runtime errors, data corruption, or unexpected behavior.    |
+| 2        | `src/Web/Areas/Identity/Pages/Account/Logout.cshtml.cs` | CRITICAL   | S1186: Add a nested comment explaining why this method is empty, throw a 'NotSupportedException' or complete the implementation. | Empty security-related methods can introduce authentication/authorization bypasses.                |
+| 3        | `src/Web/Pages/Basket/Success.cshtml.cs` | CRITICAL   | S1186: Add a nested comment explaining why this method is empty, throw a 'NotSupportedException' or complete the implementation. | Unimplemented code in user-facing flows can lead to logic or security holes.                      |
+| 4        | `src/Web/Pages/Privacy.cshtml.cs` | CRITICAL   | S1186: Add a nested comment explaining why this method is empty, throw a 'NotSupportedException' or complete the implementation. | Privacy page is a legal requirement; empty handler may break compliance or user trust.             |
+| 5        | `src/Web/Controllers/ManageController.cs` | MAJOR (x16) | S112: 'System.ApplicationException' should not be thrown by user code.                              | Misuse of exceptions can mask real errors, hinder error handling, and cause information leaks.     |
+| 6        | `src/ApplicationCore/Entities/CatalogItem.cs` | MAJOR      | S6562: Provide the "DateTimeKind" when creating this object.                                        | Ambiguous DateTime can cause logic errors, especially in distributed/time-sensitive systems.       |
+| 7        | `src/ApplicationCore/Exceptions/EmptyBasketOnCheckoutException.cs` | MAJOR      | S3925: Update ISerializable implementation and add SerializableAttribute.                           | Incorrect serialization can cause runtime errors, data loss, or security issues in distributed apps.|
+| 8        | `src/ApplicationCore/Exceptions/EmptyBasketOnCheckoutException.cs` | MAJOR      | SYSLIB0051: Obsolete SerializationInfo/StreamingContext usage.                                      | Use of obsolete serialization APIs can break compatibility and introduce vulnerabilities.          |
+| 9        | `src/Web/Views/Shared/_Layout.cshtml` | MAJOR      | S5254: Add "lang" and/or "xml:lang" attributes to this "<html>" element.                            | Accessibility and SEO impact; missing language can affect screen readers and compliance.           |
+| 10       | `src/Web/Views/Manage/ExternalLogins.cshtml` | MAJOR      | S5256: Add "<th>" headers to this "<table>".                                                        | Accessibility issue; missing headers can make tables unusable for assistive technologies.          |
+
+---
+
+## 2. **Per-Module Security & Code Quality Assessment**
+
+### **A. src/Infrastructure/Data**
+- **Critical:** Parameter naming mismatch in `CatalogContext.cs` (base class contract violation).
+- **Major:** Static constructor issues, logging template consistency.
+- **Overall:** Needs immediate attention to base class contract and static usage.
+
+### **B. src/Web/Areas/Identity/Pages/Account**
+- **Critical:** Empty method in `Logout.cshtml.cs` (potential security bypass).
+- **Major:** Commented out code in `Login.cshtml.cs`.
+- **Overall:** Security-sensitive area; ensure all authentication logic is implemented and reviewed.
+
+### **C. src/Web/Pages/Basket/Success.cshtml.cs & Privacy.cshtml.cs**
+- **Critical:** Empty methods in user-facing flows.
+- **Overall:** Unimplemented handlers can lead to broken flows or security gaps.
+
+### **D. src/Web/Controllers/ManageController.cs**
+- **Major:** Repeated misuse of `ApplicationException` (16+ occurrences).
+- **Minor:** Hardcoded paths, method overload adjacency, minor code quality issues.
+- **Overall:** Exception handling is a significant risk; must be refactored for robust error management.
+
+### **E. src/ApplicationCore/Entities/CatalogItem.cs**
+- **Major:** DateTimeKind not specified.
+- **Minor:** Caller info hiding.
+- **Overall:** Potential for subtle bugs in time-sensitive logic.
+
+### **F. src/ApplicationCore/Exceptions/EmptyBasketOnCheckoutException.cs**
+- **Major:** Serialization issues, use of obsolete APIs.
+- **Overall:** Serialization bugs can lead to data loss or security vulnerabilities.
+
+### **G. src/Web/Views/Shared/_Layout.cshtml & Views/Manage/ExternalLogins.cshtml**
+- **Major:** Accessibility issues (missing lang attributes, table headers).
+- **Overall:** Impacts compliance and user experience for assistive tech users.
+
+---
+
+## 3. **Actionable Recommendations**
+
+### **1. CatalogContext Parameter Naming (CRITICAL)**
+- **Action:** Rename the parameter in `OnModelCreating` from `builder` to `modelBuilder` to match the base class.
+- **Rationale:** Prevents runtime errors and ensures correct EF Core behavior.
+
+### **2. Empty Security/Privacy Methods (CRITICAL)**
+- **Action:** For all empty methods in security or privacy-related files:
+  - Implement the required logic.
+  - If intentionally empty, add a comment explaining why, or throw `NotSupportedException`.
+- **Rationale:** Prevents accidental bypass of authentication/authorization or compliance requirements.
+
+### **3. Exception Handling in ManageController (MAJOR)**
+- **Action:** Replace all `throw new ApplicationException(...)` with more specific exception types (e.g., `InvalidOperationException`, `ArgumentException`, or custom exceptions).
+- **Rationale:** `ApplicationException` is not intended for user code and can mask real issues.
+
+### **4. DateTimeKind in CatalogItem (MAJOR)**
+- **Action:** Always specify `DateTimeKind` (e.g., `DateTime.UtcNow` or `DateTime.SpecifyKind(...)`) when creating DateTime objects.
+- **Rationale:** Prevents time zone bugs and ensures consistency across distributed systems.
+
+### **5. Serialization in EmptyBasketOnCheckoutException (MAJOR)**
+- **Action:** 
+  - Add `[Serializable]` attribute to the class.
+  - Update serialization logic to use recommended .NET patterns.
+  - Remove obsolete `SerializationInfo, StreamingContext` constructor if not needed.
+- **Rationale:** Ensures compatibility and prevents runtime serialization errors.
+
+### **6. Accessibility in Layout and Tables (MAJOR)**
+- **Action:** 
+  - Add `lang` and/or `xml:lang` attributes to `<html>` elements.
+  - Add `<th>` headers to all tables and ensure proper table semantics.
+- **Rationale:** Improves accessibility for screen readers and compliance with web standards.
+
+### **7. Static/Protected Constructors (MAJOR)**
+- **

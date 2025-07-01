@@ -1,0 +1,89 @@
+# Static Analysis Security Review
+
+## 1. **Top 10 Most Severe Issues**
+
+| Priority | File/Module | Severity | Rule | Description | Why Critical |
+|----------|-------------|----------|------|-------------|--------------|
+| 1 | `src/Infrastructure/Data/CatalogContext.cs` | CRITICAL | S927 | Rename parameter 'builder' to 'modelBuilder' to match the base class declaration. | **Could cause runtime errors or misbehavior in EF Core migrations, breaking DB schema or data access.** |
+| 2 | `src/Web/Areas/Identity/Pages/Account/Logout.cshtml.cs` | CRITICAL | S1186 | Add a nested comment explaining why this method is empty, throw a 'NotSupportedException' or complete the implementation. | **Empty method in authentication flow may break logout, leading to security/session issues.** |
+| 3 | `src/Web/Pages/Basket/Success.cshtml.cs` | CRITICAL | S1186 | Add a nested comment explaining why this method is empty, throw a 'NotSupportedException' or complete the implementation. | **Empty handler in checkout flow may break order completion, causing logic or security gaps.** |
+| 4 | `src/Web/Pages/Privacy.cshtml.cs` | CRITICAL | S1186 | Add a nested comment explaining why this method is empty, throw a 'NotSupportedException' or complete the implementation. | **Empty privacy page handler may result in incomplete privacy compliance or broken UI.** |
+| 5 | `src/Web/Controllers/ManageController.cs` | MAJOR (x16) | S112 | 'System.ApplicationException' should not be thrown by user code. | **Throwing generic exceptions can hide real errors, hinder error handling, and expose sensitive info.** |
+| 6 | `src/ApplicationCore/Entities/CatalogItem.cs` | MAJOR | S6562 | Provide the "DateTimeKind" when creating this object. | **Ambiguous DateTime can cause time zone bugs, data corruption, or security issues (e.g., token expiry).** |
+| 7 | `src/ApplicationCore/Exceptions/EmptyBasketOnCheckoutException.cs` | MAJOR | S3925 / SYSLIB0051 | Update ISerializable implementation, add SerializableAttribute, avoid obsolete serialization. | **Incorrect serialization can break error handling, logging, or distributed scenarios.** |
+| 8 | `src/Web/Views/Manage/ExternalLogins.cshtml` | MAJOR | Web:S5256 | Add "<th>" headers to this "<table>". | **Missing headers impacts accessibility and may cause confusion in authentication/identity UI.** |
+| 9 | `src/Web/Views/Order/Detail.cshtml` | MAJOR | S4143 | Verify this is the index/key that was intended; a value has already been set for it. | **Potential data overwrite or logic bug in order details, possibly exposing or corrupting order data.** |
+| 10 | `src/Web/Views/Shared/_Layout.cshtml` | MAJOR | Web:S5254 | Add "lang" and/or "xml:lang" attributes to this "<html>" element | **Missing language attribute impacts accessibility and SEO, and may cause localization issues.** |
+
+---
+
+## 2. **Per-Module Security and Code Quality Assessment**
+
+### **src/Infrastructure/Data**
+- **Critical:** Parameter naming mismatch in `CatalogContext.cs` (CRITICAL, S927).
+- **Major:** Static constructor enforcement, logging template consistency.
+- **Overall:** **High risk** for DB schema/EF Core issues; moderate maintainability concerns.
+
+### **src/Web/Areas/Identity/Pages/Account**
+- **Critical:** Empty logout handler (`Logout.cshtml.cs`).
+- **Major:** Commented-out code in login handler.
+- **Overall:** **High risk** for authentication/session management bugs.
+
+### **src/Web/Pages/Basket**
+- **Critical:** Empty success handler.
+- **Major:** Nested/merged if statements, missing alt attributes.
+- **Overall:** **Moderate risk** for checkout flow bugs; minor accessibility issues.
+
+### **src/Web/Pages/Privacy.cshtml.cs**
+- **Critical:** Empty privacy handler.
+- **Overall:** **Compliance risk** for privacy requirements.
+
+### **src/Web/Controllers/ManageController.cs**
+- **Major:** Repeated misuse of `ApplicationException`, hardcoded paths, method overload order.
+- **Overall:** **High risk** for error handling, maintainability, and potential information disclosure.
+
+### **src/ApplicationCore/Entities/CatalogItem.cs**
+- **Major:** DateTimeKind ambiguity.
+- **Minor:** Caller info hiding.
+- **Overall:** **Moderate risk** for time zone/data bugs.
+
+### **src/ApplicationCore/Exceptions/EmptyBasketOnCheckoutException.cs**
+- **Major:** Serialization issues.
+- **Overall:** **Moderate risk** for error handling in distributed scenarios.
+
+### **src/Web/Views/Manage/ExternalLogins.cshtml**
+- **Major:** Table accessibility.
+- **Overall:** **Accessibility risk** for identity management UI.
+
+### **src/Web/Views/Order/Detail.cshtml**
+- **Major:** Index/key logic bug.
+- **Overall:** **Potential data integrity risk**.
+
+### **src/Web/Views/Shared/_Layout.cshtml**
+- **Major:** Missing language attribute.
+- **Overall:** **Accessibility and localization risk**.
+
+---
+
+## 3. **Actionable Recommendations**
+
+### **1. `src/Infrastructure/Data/CatalogContext.cs` (S927)**
+- **Action:** Rename the parameter `builder` to `modelBuilder` in method signatures to match the base class. This ensures EF Core conventions are followed and avoids runtime errors.
+- **Reference:** [EF Core OnModelCreating](https://docs.microsoft.com/en-us/ef/core/modeling/)
+
+### **2. `src/Web/Areas/Identity/Pages/Account/Logout.cshtml.cs` (S1186)**
+- **Action:** Implement the logout handler or explicitly document why it is empty. If not needed, throw `NotSupportedException` to prevent silent failures.
+- **Reference:** [ASP.NET Core Identity Logout](https://docs.microsoft.com/en-us/aspnet/core/security/authentication/identity)
+
+### **3. `src/Web/Pages/Basket/Success.cshtml.cs` (S1186)**
+- **Action:** Implement the success handler logic or document its emptiness. Ensure order completion and user feedback are handled securely.
+
+### **4. `src/Web/Pages/Privacy.cshtml.cs` (S1186)**
+- **Action:** Implement privacy page logic or document why it is empty. Ensure privacy policy is accessible and compliant.
+
+### **5. `src/Web/Controllers/ManageController.cs` (S112)**
+- **Action:** Replace all `ApplicationException` throws with more specific exceptions (e.g., `InvalidOperationException`, `ArgumentException`). Avoid exposing sensitive info in exception messages.
+- **Reference:** [Exception Handling Best Practices](https://docs.microsoft.com/en-us/dotnet/standard/exceptions/best-practices-for-exceptions)
+
+### **6. `src/ApplicationCore/Entities/CatalogItem.cs` (S6562)**
+- **Action:** Specify
