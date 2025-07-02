@@ -7,6 +7,8 @@ env:
   OPENAI_DEPLOYMENT_NAME: ${{ secrets.OPENAI_DEPLOYMENT_NAME }}
   BLOB_SAS_URL: ${{ secrets.BLOB_SAS_URL }}
   BLOB_SAS_TOKEN: ${{ secrets.BLOB_SAS_TOKEN }}
+  BLOB_SAS_URL_full: ${{ secrets.BLOB_SAS_URL_full }}
+  BLOB_SAS_TOKEN_full: ${{ secrets.BLOB_SAS_TOKEN_full }}
   SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
   SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
   DOTNET_ROOT: /usr/share/dotnet
@@ -100,6 +102,7 @@ jobs:
       - name: Upload SonarQube Reports using Azure CLI with SAS Token 
         env:
           AZURE_STORAGE_SAS_TOKEN: ${{ secrets.BLOB_SAS_TOKEN }}
+          BLOB_SAS_TOKEN_full: ${{ secrets.BLOB_SAS_TOKEN_full }}
           AZURE_STORAGE_ACCOUNT: storagedevsecops
           AZURE_STORAGE_CONTAINER: sonarinput
           AZURE_STORAGE_CONTAINER_full: fulljson
@@ -121,7 +124,7 @@ jobs:
             --container-name "$AZURE_STORAGE_CONTAINER_full" \
             --name "$BEAUTIFIED" \
             --file "$BEAUTIFIED" \
-            --sas-token "$AZURE_STORAGE_SAS_TOKEN" \
+            --sas-token "BLOB_SAS_TOKEN_full" \
             --auth-mode key
 
           # Upload REDUCED to sonarinput container
