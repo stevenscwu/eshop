@@ -122,7 +122,6 @@ jobs:
             --name "$BEAUTIFIED" \
             --file "$BEAUTIFIED" \
             --sas-token "$AZURE_STORAGE_SAS_TOKEN" \
-            --auth-mode key
             --overwrite true
 
           # Upload the reduced report to trigger function container
@@ -132,13 +131,13 @@ jobs:
             --name "$REDUCED" \
             --file "$REDUCED" \
             --sas-token "$AZURE_STORAGE_SAS_TOKEN" \
-            --auth-mode key
             --overwrite true
 
           mkdir -p "report/${FOLDER_DATE}"
           cp "$BEAUTIFIED" "report/${FOLDER_DATE}/"
           cp "$REDUCED" "report/${FOLDER_DATE}/"
           echo "Reports saved to report/${FOLDER_DATE}/"
+
 
 
 
