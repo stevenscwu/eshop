@@ -99,13 +99,11 @@ jobs:
             echo "WARNING: No issues found in SonarQube report. This might cause problems with the GPT analysis."
           fi
 
-      - name: Upload SonarQube Reports using Azure CLI with SAS Token 
+      - name: Upload SonarQube Reports using Azure CLI with SAS Token
         env:
           AZURE_STORAGE_SAS_TOKEN: ${{ secrets.BLOB_SAS_TOKEN }}
-          BLOB_SAS_TOKEN_full: ${{ secrets.BLOB_SAS_TOKEN_full }}
           AZURE_STORAGE_ACCOUNT: storagedevsecops
           AZURE_STORAGE_CONTAINER: sonarinput
-          AZURE_STORAGE_CONTAINER_full: fulljson
         run: |
           sudo apt-get update && sudo apt-get install -y jq azure-cli
 
@@ -118,23 +116,16 @@ jobs:
           REDUCED="reduced-sonar-report-${TIMESTAMP}.json"
           jq '{issues: [.issues[] | {file: .component, message: .message, severity: .severity, rule: .rule}]}' "$BEAUTIFIED" > "$REDUCED"
 
-          # Upload BEAUTIFIED to fulljson container
-          az storage blob upload \
-            --account-name "$AZURE_STORAGE_ACCOUNT" \
-            --container-name "$AZURE_STORAGE_CONTAINER_full" \
-            --name "$BEAUTIFIED" \
-            --file "$BEAUTIFIED" \
-            --sas-token "BLOB_SAS_TOKEN_full" \
-            --auth-mode key
-
-          # Upload REDUCED to sonarinput container
-          az storage blob upload \
-            --account-name "$AZURE_STORAGE_ACCOUNT" \
-            --container-name "$AZURE_STORAGE_CONTAINER" \
-            --name "$REDUCED" \
-            --file "$REDUCED" \
-            --sas-token "$AZURE_STORAGE_SAS_TOKEN" \
-            --auth-mode key
+          # Explicit Azure CLI upload with --auth-mode key and proper SAS token
+          for FILE in "$BEAUTIFIED" "$REDUCED"; do
+            az storage blob upload \
+              --account-name "$AZURE_STORAGE_ACCOUNT" \
+              --container-name "$AZURE_STORAGE_CONTAINER" \
+              --name "$FILE" \
+              --file "$FILE" \
+              --sas-token "$AZURE_STORAGE_SAS_TOKEN" \
+              --auth-mode key
+          done
 
           mkdir -p "report/${FOLDER_DATE}"
           cp "$BEAUTIFIED" "report/${FOLDER_DATE}/"
