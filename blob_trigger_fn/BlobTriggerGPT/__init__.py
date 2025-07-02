@@ -58,7 +58,9 @@ def main(inputblob: func.InputStream, outputblob: func.Out[str]):
             max_tokens=1500,
         )
         summary = chat_response.choices[0].message.content
-        print("Token usage:",chat_response.usage)
+        # print("Token usage:", chat_response.usage)
+        logging.info("Token usage: %s", chat_response.usage)
+
     except Exception as e:
         logging.error("OpenAI API error: %s", repr(e))
         summary = f"OpenAI API error: {e}"
