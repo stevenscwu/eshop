@@ -115,23 +115,16 @@ jobs:
           REDUCED="reduced-sonar-report-${TIMESTAMP}.json"
           jq '{issues: [.issues[] | {file: .component, message: .message, severity: .severity, rule: .rule}]}' "$BEAUTIFIED" > "$REDUCED"
 
-          # Upload full json report to container fulljson
-          az storage blob upload \
-            --account-name "$AZURE_STORAGE_ACCOUNT" \
-            --container-name "$AZURE_STORAGE_CONTAINER_full" \
-            --name "$BEAUTIFIED" \
-            --file "$BEAUTIFIED" \
-            --sas-token "$AZURE_STORAGE_SAS_TOKEN" \
-            --overwrite true
-
-          # Upload the reduced report to trigger function container
-          az storage blob upload \
-            --account-name "$AZURE_STORAGE_ACCOUNT" \
-            --container-name "$AZURE_STORAGE_CONTAINER" \
-            --name "$REDUCED" \
-            --file "$REDUCED" \
-            --sas-token "$AZURE_STORAGE_SAS_TOKEN" \
-            --overwrite true
+          # Explicit Azure CLI upload with --auth-mode key and proper SAS token
+          for FILE in "$BEAUTIFIED" "$REDUCED"; do
+            az storage blob upload \
+              --account-name "$AZURE_STORAGE_ACCOUNT" \
+              --container-name "$AZURE_STORAGE_CONTAINER" \
+              --name "$FILE" \
+              --file "$FILE" \
+              --sas-token "$AZURE_STORAGE_SAS_TOKEN" \
+              --auth-mode key
+          done
 
           mkdir -p "report/${FOLDER_DATE}"
           cp "$BEAUTIFIED" "report/${FOLDER_DATE}/"
