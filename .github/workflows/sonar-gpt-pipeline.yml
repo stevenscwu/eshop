@@ -102,6 +102,7 @@ jobs:
           AZURE_STORAGE_SAS_TOKEN: ${{ secrets.BLOB_SAS_TOKEN }}
           AZURE_STORAGE_ACCOUNT: storagedevsecops
           AZURE_STORAGE_CONTAINER: sonarinput
+          AZURE_STORAGE_CONTAINER_full: fulljson
         run: |
           sudo apt-get update && sudo apt-get install -y jq azure-cli
 
@@ -111,17 +112,32 @@ jobs:
           BEAUTIFIED="sonar-report-${TIMESTAMP}.json"
           jq '.' sonar-report.json > "$BEAUTIFIED"
 
-          # Upload only the beautified report
+          REDUCED="reduced-sonar-report-${TIMESTAMP}.json"
+          jq '{issues: [.issues[] | {file: .component, message: .message, severity: .severity, rule: .rule}]}' "$BEAUTIFIED" > "$REDUCED"
+
+          # Upload full json report to container fulljson
           az storage blob upload \
             --account-name "$AZURE_STORAGE_ACCOUNT" \
-            --container-name "$AZURE_STORAGE_CONTAINER" \
+            --container-name "$AZURE_STORAGE_CONTAINER_full" \
             --name "$BEAUTIFIED" \
             --file "$BEAUTIFIED" \
             --sas-token "$AZURE_STORAGE_SAS_TOKEN" \
             --auth-mode key
+            --overwrite true
+
+          # Upload the reduced report to trigger function container
+          az storage blob upload \
+            --account-name "$AZURE_STORAGE_ACCOUNT" \
+            --container-name "$AZURE_STORAGE_CONTAINER" \
+            --name "$REDUCED" \
+            --file "$REDUCED" \
+            --sas-token "$AZURE_STORAGE_SAS_TOKEN" \
+            --auth-mode key
+            --overwrite true
 
           mkdir -p "report/${FOLDER_DATE}"
           cp "$BEAUTIFIED" "report/${FOLDER_DATE}/"
+          cp "$REDUCED" "report/${FOLDER_DATE}/"
           echo "Reports saved to report/${FOLDER_DATE}/"
 
 
