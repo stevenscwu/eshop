@@ -114,7 +114,7 @@ jobs:
           jq '.' sonar-report.json > "$BEAUTIFIED"
 
           REDUCED="reduced-sonar-report-${TIMESTAMP}.json"
-          jq '{issues: [.issues[] | {file: .component, message: .message, severity: .severity, rule: .rule}]}' "$BEAUTIFIED" > "$REDUCED"
+          jq '{issues: [.issues[] | {file: .component, message: .message, severity: .severity, rule: .rule, line: .line, effort: .effort, type: .type}]}' "$BEAUTIFIED" > "$REDUCED"
 
           # Explicit Azure CLI upload with --auth-mode key and proper SAS token
           for FILE in "$BEAUTIFIED" "$REDUCED"; do
