@@ -12,7 +12,7 @@ def main(inputblob: func.InputStream, outputblob: func.Out[str]):
 
     prompt = (
         "You are a secure code reviewer with deep knowledge of software vulnerabilities. "
-        "Given the following static analysis results from SonarQube (backend) and ESLint (frontend), perform the following tasks:\n\n"
+        "Given the following static analysis results from SonarQube, perform the following tasks:\n\n"
         "1. Identify the top 10 most severe issues and explain why they are critical.\n"
         "2. Group issues by file/module and summarize their overall security and code quality state.\n"
         "3. Recommend specific refactoring or remediation actions for the top issues using secure coding best practices.\n"

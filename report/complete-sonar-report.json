@@ -1,55 +1,14 @@
 {
-  "total": 159,
+  "total": 158,
   "p": 1,
   "ps": 500,
   "paging": {
     "pageIndex": 1,
     "pageSize": 500,
-    "total": 159
+    "total": 158
   },
-  "effortTotal": 913,
+  "effortTotal": 908,
   "issues": [
-    {
-      "key": "773aff0d-bcc6-4667-81f3-7151cfa62116",
-      "rule": "python:S1481",
-      "severity": "MINOR",
-      "component": "eshop:blob_trigger_fn/BlobTriggerGPT/__init__.py",
-      "project": "eshop",
-      "hash": "e6dadeb366d57d46b9329aa05d3114a1",
-      "textRange": {
-        "startLine": 33,
-        "endLine": 33,
-        "startOffset": 8,
-        "endOffset": 21
-      },
-      "flows": [],
-      "resolution": "FIXED",
-      "status": "CLOSED",
-      "message": "Remove the unused local variable \"deployment_id\".",
-      "effort": "5min",
-      "debt": "5min",
-      "author": "stevenscwu@gmail.com",
-      "tags": [
-        "unused"
-      ],
-      "creationDate": "2025-06-29T05:55:32+0000",
-      "updateDate": "2025-06-29T09:33:08+0000",
-      "closeDate": "2025-06-29T09:33:08+0000",
-      "type": "CODE_SMELL",
-      "scope": "MAIN",
-      "quickFixAvailable": false,
-      "messageFormattings": [],
-      "codeVariants": [],
-      "cleanCodeAttribute": "CLEAR",
-      "cleanCodeAttributeCategory": "INTENTIONAL",
-      "impacts": [
-        {
-          "softwareQuality": "MAINTAINABILITY",
-          "severity": "LOW"
-        }
-      ],
-      "issueStatus": "FIXED"
-    },
     {
       "key": "4901e1d0-e12a-43b6-b6c3-2e973e674ba1",
       "rule": "python:S1481",
@@ -136,6 +95,7 @@
       "severity": "MINOR",
       "component": "eshop:sonar-gpt-fn/AnalyzeSonarReport/__init__.py",
       "project": "eshop",
+      "line": 80,
       "hash": "5e11fcffc5ca1f600d0bf53d38f19ae7",
       "textRange": {
         "startLine": 80,
@@ -144,8 +104,7 @@
         "endOffset": 25
       },
       "flows": [],
-      "resolution": "FIXED",
-      "status": "CLOSED",
+      "status": "OPEN",
       "message": "Remove the unused local variable \"e\".",
       "effort": "5min",
       "debt": "5min",
@@ -154,8 +113,7 @@
         "unused"
       ],
       "creationDate": "2025-06-20T07:41:01+0000",
-      "updateDate": "2025-06-27T09:35:01+0000",
-      "closeDate": "2025-06-27T09:35:01+0000",
+      "updateDate": "2025-06-21T08:19:07+0000",
       "type": "CODE_SMELL",
       "scope": "MAIN",
       "quickFixAvailable": false,
@@ -169,7 +127,7 @@
           "severity": "LOW"
         }
       ],
-      "issueStatus": "FIXED"
+      "issueStatus": "OPEN"
     },
     {
       "key": "7505b9d1-9cc9-48e7-8cd1-dc141ae0f873",
@@ -6631,7 +6589,7 @@
     },
     {
       "key": "eshop:sonar-gpt-fn/AnalyzeSonarReport/__init__.py",
-      "enabled": false,
+      "enabled": true,
       "qualifier": "FIL",
       "name": "__init__.py",
       "longName": "sonar-gpt-fn/AnalyzeSonarReport/__init__.py",
@@ -6667,14 +6625,6 @@
       "name": "_product.cshtml",
       "longName": "src/Web/Pages/Shared/_product.cshtml",
       "path": "src/Web/Pages/Shared/_product.cshtml"
-    },
-    {
-      "key": "eshop:blob_trigger_fn/BlobTriggerGPT/__init__.py",
-      "enabled": true,
-      "qualifier": "FIL",
-      "name": "__init__.py",
-      "longName": "blob_trigger_fn/BlobTriggerGPT/__init__.py",
-      "path": "blob_trigger_fn/BlobTriggerGPT/__init__.py"
     },
     {
       "key": "eshop:src/ApplicationCore/Extensions/GuardExtensions.cs",
@@ -6742,7 +6692,7 @@
     },
     {
       "key": "eshop:sonar-gpt-fn/function_app.py",
-      "enabled": false,
+      "enabled": true,
       "qualifier": "FIL",
       "name": "function_app.py",
       "longName": "sonar-gpt-fn/function_app.py",
