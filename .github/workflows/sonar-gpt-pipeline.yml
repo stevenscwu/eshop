@@ -60,14 +60,7 @@ jobs:
       - name: Wait for SonarQube to finalize
         run: |
           echo "Generating SonarQube report... Please wait, this may take a minute."
-          i=0
-          sp='|/-\'
-          while [ $i -lt 60 ]; do
-            printf "\b${sp:i%4:1}"
-            sleep 1
-            i=$((i+1))
-          done
-          echo ""
+          sleep 60
 
       - name: Download SonarQube Issues
         run: |
