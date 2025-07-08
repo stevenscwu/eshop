@@ -11,16 +11,26 @@ def main(inputblob: func.InputStream, outputblob: func.Out[str]):
         return
 
     prompt = (
-        "You are a secure code reviewer with deep knowledge of software vulnerabilities. "
-        "Given the following static analysis results from SonarQube, perform the following tasks:\n\n"
-        "1. Identify the top 10 most severe issues and explain why they are critical.\n"
-        "2. Group issues by file/module and summarize their overall security and code quality state.\n"
-        "3. Recommend specific refactoring or remediation actions for the top issues using secure coding best practices.\n"
-        "4. Present your output in well-structured markdown, including:\n"
-        "   - A prioritized issue summary table\n"
-        "   - A per-module security assessment\n"
-        "   - Actionable recommendations\n\n"
-        f"Analysis results:\n{data}"
+        "You are a security engineer. Your job is to review a SonarQube static analysis report (in JSON format), "
+        "which contains a list of issues of varying severity, type, and location in the code. "
+        "The purpose is to help developers and managers quickly understand the security and code quality risks, "
+        "and prioritize what needs to be fixed.\n\n"
+        "Given the following SonarQube JSON report, perform these tasks:\n"
+        "1. Top Critical Issues:\n"
+        "   - List the top 10 most severe issues, showing severity, file and line number, rule/key, "
+        "short description, and *why* this issue is critical and what could happen if not fixed.\n"
+        "2. Summary by Severity:\n"
+        "   - Provide a count of issues by severity (e.g., BLOCKER, CRITICAL, MAJOR, MINOR, INFO).\n"
+        "3. Issue Type Breakdown:\n"
+        "   - Summarize how many issues are bugs, vulnerabilities, and code smells.\n"
+        "4. Key Patterns/Hotspots:\n"
+        "   - Point out any files, modules, or code sections with a concentration of severe issues or repeated patterns.\n"
+        "5. Actionable Next Steps:\n"
+        "   - Give 3–5 clear, prioritized recommendations for the development team, focusing first on eliminating "
+        "critical/blocker security and reliability issues.\n"
+        "If the report is very large, highlight areas that may be overwhelming and suggest ways to triage. "
+        "Produce your output as markdown, using tables or bullet points as needed for clarity. Be concise, but do not omit important security or reliability risks.\n\n"
+        f"Here is the SonarQube JSON report:\n{data}"
     )
 
     # --- OpenAI credentials (env vars) ---
