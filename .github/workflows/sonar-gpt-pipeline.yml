@@ -59,7 +59,7 @@ jobs:
 
       - name: Wait for SonarQube to finalize
         run: |
-          echo "Generating SonarQube report with... Please wait, this may take a minute."
+          echo "Generating SonarQube report with.gpt4.1.. Please wait, this may take a minute."
           sleep 60
 
       - name: Download SonarQube Issues
